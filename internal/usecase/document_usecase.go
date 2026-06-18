@@ -64,9 +64,8 @@ func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fil
 	}
 
 	// 4. Publish to RabbitMQ
-	// Ingestion service will read from the same shared folder
-	dockerSharedPath := filepath.Join("/shared_docs", fileName)
-	err = u.publisher.PublishDocumentTask(ctx, documentID, dockerSharedPath)
+	// Ingestion service will read from the same relative shared folder
+	err = u.publisher.PublishDocumentTask(ctx, documentID, filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to publish to RabbitMQ: %v", err)
 	}
