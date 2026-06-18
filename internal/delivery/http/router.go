@@ -8,9 +8,10 @@ import (
 	"telis-api-gateway/internal/delivery/http/middleware"
 	v1 "telis-api-gateway/internal/delivery/http/v1"
 	"telis-api-gateway/internal/domain"
+	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
 )
 
-func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase) *gin.Engine {
+func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
 	r := gin.Default()
 
 	// Health Check
@@ -28,6 +29,12 @@ func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase) *gin.Engine
 		protected := apiV1.Group("/")
 		protected.Use(middleware.JWTAuthMiddleware(cfg))
 		{
+			// Document Routes
+			v1.NewDocumentHandler(protected, docUsecase)
+
+			// Chat Routes
+			v1.NewChatHandler(protected, agentClient)
+
 			// Example Ping route accessible to everyone with a valid token
 			protected.GET("/ping", func(c *gin.Context) {
 				userID, _ := c.Get("user_id")

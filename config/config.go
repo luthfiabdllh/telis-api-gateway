@@ -22,6 +22,8 @@ type Config struct {
 	JWTSecret           string
 	JWTAccessExpMinutes int
 	JWTRefreshExpDays   int
+	RabbitMQURL         string
+	AgentServiceURL     string
 }
 
 func LoadConfig() *Config {
@@ -43,6 +45,8 @@ func LoadConfig() *Config {
 		JWTSecret:           getEnv("JWT_SECRET", "secret"),
 		JWTAccessExpMinutes: accessExp,
 		JWTRefreshExpDays:   refreshExp,
+		RabbitMQURL:         getEnv("RABBITMQ_URL", "amqp://telis_rmq:telis_secret_rmq@localhost:5672/"),
+		AgentServiceURL:     getEnv("AGENT_SERVICE_URL", "localhost:8001"),
 	}
 }
 

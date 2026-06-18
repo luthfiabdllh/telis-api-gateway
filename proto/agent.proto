@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package agent;
+option go_package = "telis-api-gateway/pb;pb";
+
+message ChatRequest {
+    string session_id = 1;
+    string user_id = 2;
+    string message = 3;
+    repeated string document_filters = 4;
+    float llm_temperature = 5;
+}
+
+message ChatResponse {
+    string content_chunk = 1; // Streamed text chunk
+    bool is_final = 2;        // Flag indicating if this is the last chunk
+}
+
+service AgentService {
+    rpc ChatStream (ChatRequest) returns (stream ChatResponse);
+}

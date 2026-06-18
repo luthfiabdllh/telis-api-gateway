@@ -5,6 +5,8 @@ import (
 
 	"telis-api-gateway/config"
 	"telis-api-gateway/internal/delivery/http"
+	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
+	"telis-api-gateway/internal/infrastructure/rabbitmq"
 	"telis-api-gateway/internal/repository"
 	"telis-api-gateway/internal/usecase"
 )
@@ -20,15 +22,34 @@ func main() {
 	}
 	log.Println("Successfully connected to PostgreSQL")
 
-	// 3. Dependency Injection (Wiring)
+	// 3. Setup External Infrastructures (RabbitMQ & gRPC)
+	rmqPublisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+	defer rmqPublisher.Close()
+	log.Println("Successfully connected to RabbitMQ")
+
+	agentClient, err := grpcClient.NewAgentClient(cfg.AgentServiceURL)
+	if err != nil {
+		log.Fatalf("Failed to create Agent gRPC Client: %v", err)
+	}
+	defer agentClient.Close()
+	log.Println("Successfully initialized gRPC Agent Client")
+
+	// 4. Dependency Injection (Wiring)
 	// Repositories (Layer 3)
 	userRepo := repository.NewUserRepository(db)
 
 	// Usecases (Layer 2)
 	authUsecase := usecase.NewAuthUsecase(userRepo, cfg)
+	
+	// Base dir for shared documents
+	sharedDocsDir := "../shared_docs" // Assuming running from root of telis-api-gateway
+	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, sharedDocsDir)
 
-	// 4. Setup Gin Router & Delivery Layer (Layer 4)
-	router := http.SetupRouter(cfg, authUsecase)
+	// 5. Setup Gin Router & Delivery Layer (Layer 4)
+	router := http.SetupRouter(cfg, authUsecase, docUsecase, agentClient)
 
 	// 5. Start Server
 	log.Printf("Starting API Gateway on port %s", cfg.Port)
