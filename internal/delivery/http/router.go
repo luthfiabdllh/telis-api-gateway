@@ -11,7 +11,7 @@ import (
 	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
 )
 
-func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
+func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, feedbackUsecase domain.FeedbackUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
 	r := gin.Default()
 
 	// Health Check
@@ -34,6 +34,9 @@ func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase 
 
 			// Chat Routes
 			v1.NewChatHandler(protected, agentClient)
+			
+			// Feedback Routes
+			v1.NewFeedbackHandler(protected, feedbackUsecase)
 
 			// Example Ping route accessible to everyone with a valid token
 			protected.GET("/ping", func(c *gin.Context) {
