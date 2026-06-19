@@ -11,7 +11,7 @@ import (
 	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
 )
 
-func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
+func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
 	r := gin.Default()
 
 	// Health Check
@@ -53,6 +53,13 @@ func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase 
 				adminGroup.GET("/stats", func(c *gin.Context) {
 					c.JSON(http.StatusOK, gin.H{"message": "Secret Admin Stats"})
 				})
+			}
+
+			// Admin and Legal Routes
+			legalGroup := protected.Group("/")
+			legalGroup.Use(middleware.RoleMiddleware("Admin", "Legal"))
+			{
+				v1.NewRedlineHandler(legalGroup, redlineUsecase)
 			}
 		}
 	}

@@ -40,6 +40,7 @@ func main() {
 	// 4. Dependency Injection (Wiring)
 	// Repositories (Layer 3)
 	userRepo := repository.NewUserRepository(db)
+	redlineRepo := repository.NewRedlineRepository(db)
 
 	// Usecases (Layer 2)
 	authUsecase := usecase.NewAuthUsecase(userRepo, cfg)
@@ -47,9 +48,10 @@ func main() {
 	// Base dir for shared documents
 	sharedDocsDir := "../shared_docs" // Assuming running from root of telis-api-gateway
 	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, sharedDocsDir)
+	redlineUsecase := usecase.NewRedlineUsecase(redlineRepo, rmqPublisher, sharedDocsDir)
 
 	// 5. Setup Gin Router & Delivery Layer (Layer 4)
-	router := http.SetupRouter(cfg, authUsecase, docUsecase, agentClient)
+	router := http.SetupRouter(cfg, authUsecase, docUsecase, redlineUsecase, agentClient)
 
 	// 5. Start Server
 	log.Printf("Starting API Gateway on port %s", cfg.Port)

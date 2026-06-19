@@ -11,6 +11,7 @@ import (
 type Publisher interface {
 	PublishDocumentTask(ctx context.Context, documentID, filePath string) error
 	PublishDeleteTask(ctx context.Context, documentID string) error
+	PublishRedlineTask(ctx context.Context, jobID, sourceFilePath, targetFilePath string) error
 	Close() error
 }
 
@@ -39,6 +40,18 @@ func NewPublisher(url string) (Publisher, error) {
 		false,             // exclusive
 		false,             // no-wait
 		nil,               // arguments
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = ch.QueueDeclare(
+		"redline_queue", // name
+		true,            // durable
+		false,           // delete when unused
+		false,           // exclusive
+		false,           // no-wait
+		nil,             // arguments
 	)
 	if err != nil {
 		return nil, err
@@ -93,6 +106,32 @@ func (p *publisher) PublishDeleteTask(ctx context.Context, documentID string) er
 		return err
 	}
 	log.Printf("Published document delete task: %s", documentID)
+	return nil
+}
+
+func (p *publisher) PublishRedlineTask(ctx context.Context, jobID, sourceFilePath, targetFilePath string) error {
+	payload := map[string]string{
+		"action":           "redline",
+		"job_id":           jobID,
+		"source_file_path": sourceFilePath,
+		"target_file_path": targetFilePath,
+	}
+	body, _ := json.Marshal(payload)
+
+	err := p.ch.PublishWithContext(ctx,
+		"",                // exchange
+		"ingestion_queue", // routing key
+		false,             // mandatory
+		false,             // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		})
+	if err != nil {
+		log.Printf("Failed to publish redline message: %v", err)
+		return err
+	}
+	log.Printf("Published redline task: %s", jobID)
 	return nil
 }
 
