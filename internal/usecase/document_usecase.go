@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func NewDocumentUsecase(publisher rabbitmq.Publisher, baseDir string) domain.Doc
 	}
 }
 
-func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader) (string, error) {
+func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, replacesDocumentID string) (string, error) {
 	// 1. Generate unique Document ID
 	documentID := uuid.New().String()
 
@@ -65,12 +66,33 @@ func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fil
 
 	// 4. Publish to RabbitMQ
 	// Ingestion service will read from the same relative shared folder
-	err = u.publisher.PublishDocumentTask(ctx, documentID, filePath)
+	err = u.publisher.PublishDocumentTask(ctx, documentID, filePath, replacesDocumentID)
 	if err != nil {
 		return "", fmt.Errorf("failed to publish to RabbitMQ: %v", err)
 	}
 
+	// If it replaces an older version, also publish deprecate task for the old document
+	if replacesDocumentID != "" {
+		err = u.publisher.PublishDeprecateTask(ctx, replacesDocumentID)
+		if err != nil {
+			log.Printf("failed to deprecate old document %s: %v", replacesDocumentID, err)
+		}
+	}
+
 	return documentID, nil
+}
+
+func (u *documentUsecase) DeprecateDocument(ctx context.Context, documentID string, userID string) error {
+	// Publish deprecate task to RabbitMQ
+	err := u.publisher.PublishDeprecateTask(ctx, documentID)
+	if err != nil {
+		return fmt.Errorf("failed to publish deprecate task to RabbitMQ: %v", err)
+	}
+
+	// NOTE: Unlike DeleteDocument, we DO NOT delete the physical PDF file
+	// because it is preserved for archival purposes.
+
+	return nil
 }
 
 func (u *documentUsecase) DeleteDocument(ctx context.Context, documentID string, userID string) error {

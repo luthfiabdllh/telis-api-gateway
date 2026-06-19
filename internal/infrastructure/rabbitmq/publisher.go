@@ -9,8 +9,9 @@ import (
 )
 
 type Publisher interface {
-	PublishDocumentTask(ctx context.Context, documentID, filePath string) error
+	PublishDocumentTask(ctx context.Context, documentID, filePath string, previousVersionID string) error
 	PublishDeleteTask(ctx context.Context, documentID string) error
+	PublishDeprecateTask(ctx context.Context, documentID string) error
 	PublishRedlineTask(ctx context.Context, jobID, sourceFilePath, targetFilePath string) error
 	Close() error
 }
@@ -60,11 +61,14 @@ func NewPublisher(url string) (Publisher, error) {
 	return &publisher{conn: conn, ch: ch}, nil
 }
 
-func (p *publisher) PublishDocumentTask(ctx context.Context, documentID, filePath string) error {
+func (p *publisher) PublishDocumentTask(ctx context.Context, documentID, filePath string, previousVersionID string) error {
 	payload := map[string]string{
 		"action":      "upload",
 		"document_id": documentID,
 		"file_path":   filePath,
+	}
+	if previousVersionID != "" {
+		payload["previous_version_id"] = previousVersionID
 	}
 	body, _ := json.Marshal(payload)
 
@@ -132,6 +136,30 @@ func (p *publisher) PublishRedlineTask(ctx context.Context, jobID, sourceFilePat
 		return err
 	}
 	log.Printf("Published redline task: %s", jobID)
+	return nil
+}
+
+func (p *publisher) PublishDeprecateTask(ctx context.Context, documentID string) error {
+	payload := map[string]string{
+		"action":      "deprecate",
+		"document_id": documentID,
+	}
+	body, _ := json.Marshal(payload)
+
+	err := p.ch.PublishWithContext(ctx,
+		"",                // exchange
+		"ingestion_queue", // routing key
+		false,             // mandatory
+		false,             // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		})
+	if err != nil {
+		log.Printf("Failed to publish deprecate message: %v", err)
+		return err
+	}
+	log.Printf("Published document deprecate task: %s", documentID)
 	return nil
 }
 
