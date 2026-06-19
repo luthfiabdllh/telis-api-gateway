@@ -19,6 +19,7 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 	docRoutes := r.Group("/documents")
 	{
 		docRoutes.POST("/upload", handler.Upload)
+		docRoutes.DELETE("/:id", handler.Delete)
 	}
 }
 
@@ -45,6 +46,31 @@ func (h *DocumentHandler) Upload(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"message":     "document uploaded successfully and queued for processing",
+		"document_id": documentID,
+	})
+}
+
+func (h *DocumentHandler) Delete(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in token"})
+		return
+	}
+
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "document id is required"})
+		return
+	}
+
+	err := h.docUsecase.DeleteDocument(c.Request.Context(), documentID, userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":     "document deletion queued",
 		"document_id": documentID,
 	})
 }

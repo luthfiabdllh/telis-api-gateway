@@ -72,3 +72,21 @@ func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fil
 
 	return documentID, nil
 }
+
+func (u *documentUsecase) DeleteDocument(ctx context.Context, documentID string, userID string) error {
+	// Publish delete task to RabbitMQ
+	err := u.publisher.PublishDeleteTask(ctx, documentID)
+	if err != nil {
+		return fmt.Errorf("failed to publish delete task to RabbitMQ: %v", err)
+	}
+
+	// Attempt to delete any physical files matching the documentID prefix
+	// Find the file by pattern since we don't store the exact filename in memory here
+	pattern := filepath.Join(u.baseDir, fmt.Sprintf("%s_*.pdf", documentID))
+	matches, _ := filepath.Glob(pattern)
+	for _, match := range matches {
+		os.Remove(match)
+	}
+
+	return nil
+}

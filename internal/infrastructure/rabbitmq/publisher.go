@@ -10,6 +10,7 @@ import (
 
 type Publisher interface {
 	PublishDocumentTask(ctx context.Context, documentID, filePath string) error
+	PublishDeleteTask(ctx context.Context, documentID string) error
 	Close() error
 }
 
@@ -48,6 +49,7 @@ func NewPublisher(url string) (Publisher, error) {
 
 func (p *publisher) PublishDocumentTask(ctx context.Context, documentID, filePath string) error {
 	payload := map[string]string{
+		"action":      "upload",
 		"document_id": documentID,
 		"file_path":   filePath,
 	}
@@ -66,7 +68,31 @@ func (p *publisher) PublishDocumentTask(ctx context.Context, documentID, filePat
 		log.Printf("Failed to publish message: %v", err)
 		return err
 	}
-	log.Printf("Published document task: %s", documentID)
+	log.Printf("Published document upload task: %s", documentID)
+	return nil
+}
+
+func (p *publisher) PublishDeleteTask(ctx context.Context, documentID string) error {
+	payload := map[string]string{
+		"action":      "delete",
+		"document_id": documentID,
+	}
+	body, _ := json.Marshal(payload)
+
+	err := p.ch.PublishWithContext(ctx,
+		"",                // exchange
+		"ingestion_queue", // routing key
+		false,             // mandatory
+		false,             // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		})
+	if err != nil {
+		log.Printf("Failed to publish delete message: %v", err)
+		return err
+	}
+	log.Printf("Published document delete task: %s", documentID)
 	return nil
 }
 
