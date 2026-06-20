@@ -45,3 +45,39 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 	}
 	return &user, nil
 }
+
+func (r *userRepository) GetAll(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*domain.User, int64, error) {
+	var users []*domain.User
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&domain.User{})
+
+	if search != "" {
+		query = query.Where("username ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if roleID != nil {
+		query = query.Where("role_id = ?", *roleID)
+	}
+	if isBanned != nil {
+		query = query.Where("is_banned = ?", *isBanned)
+	}
+
+	// Count total documents
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Pagination
+	offset := (page - 1) * limit
+	err := query.Preload("Role").Order("created_at desc").Offset(offset).Limit(limit).Find(&users).Error
+
+	return users, total, err
+}
+
+func (r *userRepository) UpdateRole(ctx context.Context, id uuid.UUID, roleID int) error {
+	return r.db.WithContext(ctx).Model(&domain.User{}).Where("id = ?", id).Update("role_id", roleID).Error
+}
+
+func (r *userRepository) UpdateStatus(ctx context.Context, id uuid.UUID, isBanned bool) error {
+	return r.db.WithContext(ctx).Model(&domain.User{}).Where("id = ?", id).Update("is_banned", isBanned).Error
+}

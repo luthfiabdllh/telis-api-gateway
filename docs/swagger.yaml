@@ -117,6 +117,18 @@ definitions:
     required:
     - email
     type: object
+  v1.UpdateRoleRequest:
+    properties:
+      role_id:
+        type: integer
+    required:
+    - role_id
+    type: object
+  v1.UpdateStatusRequest:
+    properties:
+      is_banned:
+        type: boolean
+    type: object
   v1.submitFeedbackRequest:
     properties:
       comment:
@@ -882,6 +894,146 @@ paths:
       summary: Ambil Status & Hasil Redline
       tags:
       - Redline
+  /users:
+    get:
+      description: Mengambil semua data pengguna dengan paginasi dan filter. Hanya
+        bisa diakses oleh Admin.
+      parameters:
+      - description: 'Nomor halaman (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Jumlah data per halaman (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: Pencarian nama atau email
+        in: query
+        name: search
+        type: string
+      - description: Filter berdasarkan Role ID (1=Admin, 2=User, 3=Legal)
+        in: query
+        name: role_id
+        type: integer
+      - description: Filter berdasarkan status banned
+        in: query
+        name: is_banned
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Daftar pengguna dengan metadata paginasi
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden (Bukan Admin)
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ambil daftar semua pengguna (Khusus Admin)
+      tags:
+      - Users
+  /users/{id}/ban:
+    put:
+      consumes:
+      - application/json
+      description: Membanned atau melepas banned pengguna. Admin tidak bisa menge-ban
+        dirinya sendiri.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Payload Update Status
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil diubah
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ban atau Unban pengguna (Khusus Admin)
+      tags:
+      - Users
+  /users/{id}/role:
+    put:
+      consumes:
+      - application/json
+      description: Mengubah wewenang (Role) pengguna. Admin tidak bisa mengubah rolenya
+        sendiri.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Payload Update Role
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil diubah
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ubah Role pengguna (Khusus Admin)
+      tags:
+      - Users
 securityDefinitions:
   BearerAuth:
     in: header

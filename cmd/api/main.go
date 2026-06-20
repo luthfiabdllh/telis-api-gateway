@@ -82,6 +82,7 @@ func main() {
 	folderRepo := repository.NewFolderRepository(sqlDB)
 
 	// Usecases (Layer 2)
+	userUsecase := usecase.NewUserUsecase(userRepo)
 	authUsecase := usecase.NewAuthUsecase(userRepo, cfg)
 	feedbackUsecase := usecase.NewFeedbackUsecase(feedbackRepo)
 	metricsUsecase := usecase.NewMetricsUsecase(metricsRepo)
@@ -93,7 +94,7 @@ func main() {
 	redlineUsecase := usecase.NewRedlineUsecase(redlineRepo, rmqPublisher, sharedDocsDir)
 
 	// 5. Setup Gin Router & Delivery Layer (Layer 4)
-	router := http.SetupRouter(cfg, authUsecase, docUsecase, redlineUsecase, feedbackUsecase, metricsUsecase, folderUsecase, agentClient)
+	router := http.SetupRouter(cfg, authUsecase, userUsecase, docUsecase, redlineUsecase, feedbackUsecase, metricsUsecase, folderUsecase, agentClient)
 
 	// 5. Start Server
 	log.Printf("Starting API Gateway on port %s", cfg.Port)

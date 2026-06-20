@@ -66,6 +66,10 @@ func (u *authUsecase) Login(ctx context.Context, email, password string) (string
 		return "", "", errors.New("invalid email or password")
 	}
 
+	if user.IsBanned {
+		return "", "", errors.New("account is banned. please contact administrator")
+	}
+
 	// 2. Verify password
 	if !utils.CheckPasswordHash(password, user.PasswordHash) {
 		return "", "", errors.New("invalid email or password")
@@ -100,6 +104,10 @@ func (u *authUsecase) LoginSSO(ctx context.Context, email string) (string, strin
 	if user == nil {
 		// Strict Whitelist: Jika tidak ada, tolak! Jangan auto-provision.
 		return "", "", errors.New("email is not registered. please contact admin to register your account first")
+	}
+
+	if user.IsBanned {
+		return "", "", errors.New("account is banned. please contact administrator")
 	}
 
 	// 2. Generate Tokens
@@ -153,6 +161,10 @@ func (u *authUsecase) RefreshToken(ctx context.Context, refreshToken string) (st
 	}
 	if user == nil {
 		return "", "", errors.New("user not found")
+	}
+
+	if user.IsBanned {
+		return "", "", errors.New("account is banned. please contact administrator")
 	}
 
 	// 5. Generate new tokens

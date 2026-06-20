@@ -21,6 +21,7 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	RoleID       int       `json:"role_id"`
 	Role         Role      `gorm:"foreignKey:RoleID" json:"role"`
+	IsBanned     bool      `json:"is_banned"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -39,4 +40,14 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
+	GetAll(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*User, int64, error)
+	UpdateRole(ctx context.Context, id uuid.UUID, roleID int) error
+	UpdateStatus(ctx context.Context, id uuid.UUID, isBanned bool) error
+}
+
+// UserUsecase defines the contract for user management
+type UserUsecase interface {
+	GetAllUsers(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*User, int64, error)
+	UpdateUserRole(ctx context.Context, id uuid.UUID, roleID int, reqByAdminID uuid.UUID) error
+	UpdateUserStatus(ctx context.Context, id uuid.UUID, isBanned bool, reqByAdminID uuid.UUID) error
 }
