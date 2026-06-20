@@ -10,6 +10,7 @@ import (
 
 type Document struct {
 	ID                uuid.UUID  `json:"id"`
+	FolderID          *uuid.UUID `json:"folder_id,omitempty"`
 	Filename          string     `json:"filename"`
 	FilePath          string     `json:"-"` // Hide file path from API
 	Status            string     `json:"status"`
@@ -28,6 +29,7 @@ type DocumentFilter struct {
 	Search       string
 	Status       string
 	IsDeprecated *bool
+	FolderID     *string
 }
 
 type DocumentRepository interface {
@@ -36,7 +38,7 @@ type DocumentRepository interface {
 }
 
 type DocumentUsecase interface {
-	UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, replacesDocumentID string) (string, error)
+	UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, folderID string, replacesDocumentID string) (string, error)
 	DeleteDocument(ctx context.Context, documentID string, userID string) error
 	DeprecateDocument(ctx context.Context, documentID string, userID string) error
 	

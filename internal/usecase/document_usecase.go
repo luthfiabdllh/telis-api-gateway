@@ -61,56 +61,51 @@ func (u *documentUsecase) GetDocumentFilePath(ctx context.Context, documentID st
 	return fullPath, doc.Filename, nil
 }
 
-func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, replacesDocumentID string) (string, error) {
+func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, folderID string, replacesDocumentID string) (string, error) {
 	// 1. Generate unique Document ID
 	documentID := uuid.New().String()
 
-	// 2. Validate file type (basic check)
-	if filepath.Ext(fileHeader.Filename) != ".pdf" {
-		return "", errors.New("only PDF files are allowed")
-	}
-
-	// 3. Save file physically to shared_docs
-	fileName := fmt.Sprintf("%s_%s", documentID, fileHeader.Filename)
-	filePath := filepath.Join(u.baseDir, fileName)
-
-	// Ensure directory exists
-	if err := os.MkdirAll(u.baseDir, 0755); err != nil {
+	// 2. Save file temporarily in shared_docs
+	if err := os.MkdirAll(u.baseDir, os.ModePerm); err != nil {
 		return "", fmt.Errorf("failed to create directory: %v", err)
 	}
+	
+	fileName := fmt.Sprintf("%s_%s", documentID, fileHeader.Filename)
+	fullPath := filepath.Join(u.baseDir, fileName)
 
-	// Open incoming file
+	// Save the physical file
 	src, err := fileHeader.Open()
 	if err != nil {
 		return "", err
 	}
 	defer src.Close()
 
-	// Create destination file
-	dst, err := os.Create(filePath)
+	dst, err := os.Create(fullPath)
 	if err != nil {
 		return "", err
 	}
 	defer dst.Close()
 
-	// Copy content
 	if _, err = io.Copy(dst, src); err != nil {
 		return "", err
 	}
 
-	// 4. Publish to RabbitMQ
-	// Ingestion service will read from the same relative shared folder
-	err = u.publisher.PublishDocumentTask(ctx, documentID, filePath, replacesDocumentID)
-	if err != nil {
-		return "", fmt.Errorf("failed to publish to RabbitMQ: %v", err)
+	// 3. Publish message to RabbitMQ for ingestion worker
+	payload := map[string]interface{}{
+		"action":               "ingest",
+		"document_id":          documentID,
+		"file_path":            fullPath,
+		"filename":             fileHeader.Filename,
+		"user_id":              userID,
+		"file_size_bytes":      fileHeader.Size,
+		"replaces_document_id": replacesDocumentID,
+		"folder_id":            folderID,
 	}
 
-	// If it replaces an older version, also publish deprecate task for the old document
-	if replacesDocumentID != "" {
-		err = u.publisher.PublishDeprecateTask(ctx, replacesDocumentID)
-		if err != nil {
-			log.Printf("failed to deprecate old document %s: %v", replacesDocumentID, err)
-		}
+	err = u.publisher.Publish(ctx, "ingestion_queue", payload)
+	if err != nil {
+		log.Printf("Failed to publish to RabbitMQ: %v", err)
+		return "", err
 	}
 
 	return documentID, nil

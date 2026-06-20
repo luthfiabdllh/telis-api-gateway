@@ -13,6 +13,7 @@ type Publisher interface {
 	PublishDeleteTask(ctx context.Context, documentID string) error
 	PublishDeprecateTask(ctx context.Context, documentID string) error
 	PublishRedlineTask(ctx context.Context, jobID, sourceFilePath, targetFilePath string) error
+	Publish(ctx context.Context, routingKey string, payload interface{}) error
 	Close() error
 }
 
@@ -160,6 +161,29 @@ func (p *publisher) PublishDeprecateTask(ctx context.Context, documentID string)
 		return err
 	}
 	log.Printf("Published document deprecate task: %s", documentID)
+	return nil
+}
+
+func (p *publisher) Publish(ctx context.Context, routingKey string, payload interface{}) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	err = p.ch.PublishWithContext(ctx,
+		"",         // exchange
+		routingKey, // routing key
+		false,      // mandatory
+		false,      // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		})
+	if err != nil {
+		log.Printf("Failed to publish message to %s: %v", routingKey, err)
+		return err
+	}
+	log.Printf("Published generic task to %s", routingKey)
 	return nil
 }
 

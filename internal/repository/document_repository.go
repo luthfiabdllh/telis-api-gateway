@@ -18,7 +18,7 @@ func NewDocumentRepository(db *sql.DB) domain.DocumentRepository {
 }
 
 func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentFilter) ([]domain.Document, int, error) {
-	query := `SELECT id, filename, file_path, status, uploaded_by, file_size_bytes, is_deprecated, previous_version_id, version, created_at, updated_at FROM ingestion.documents WHERE 1=1`
+	query := `SELECT id, folder_id, filename, file_path, status, uploaded_by, file_size_bytes, is_deprecated, previous_version_id, version, created_at, updated_at FROM ingestion.documents WHERE 1=1`
 	countQuery := `SELECT count(*) FROM ingestion.documents WHERE 1=1`
 
 	var conditions []string
@@ -41,6 +41,16 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 		conditions = append(conditions, fmt.Sprintf("is_deprecated = $%d", argId))
 		args = append(args, *filter.IsDeprecated)
 		argId++
+	}
+
+	if filter.FolderID != nil {
+		if *filter.FolderID == "null" || *filter.FolderID == "" {
+			conditions = append(conditions, "folder_id IS NULL")
+		} else {
+			conditions = append(conditions, fmt.Sprintf("folder_id = $%d", argId))
+			args = append(args, *filter.FolderID)
+			argId++
+		}
 	}
 
 	if len(conditions) > 0 {
@@ -81,7 +91,7 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 	for rows.Next() {
 		var doc domain.Document
 		err := rows.Scan(
-			&doc.ID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
+			&doc.ID, &doc.FolderID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
 			&doc.FileSizeBytes, &doc.IsDeprecated, &doc.PreviousVersionID,
 			&doc.Version, &doc.CreatedAt, &doc.UpdatedAt,
 		)
@@ -95,11 +105,11 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 }
 
 func (r *documentRepository) GetByID(ctx context.Context, id string) (*domain.Document, error) {
-	query := `SELECT id, filename, file_path, status, uploaded_by, file_size_bytes, is_deprecated, previous_version_id, version, created_at, updated_at FROM ingestion.documents WHERE id = $1`
+	query := `SELECT id, folder_id, filename, file_path, status, uploaded_by, file_size_bytes, is_deprecated, previous_version_id, version, created_at, updated_at FROM ingestion.documents WHERE id = $1`
 
 	var doc domain.Document
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&doc.ID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
+		&doc.ID, &doc.FolderID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
 		&doc.FileSizeBytes, &doc.IsDeprecated, &doc.PreviousVersionID,
 		&doc.Version, &doc.CreatedAt, &doc.UpdatedAt,
 	)

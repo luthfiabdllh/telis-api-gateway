@@ -52,15 +52,11 @@ func (h *DocumentHandler) Upload(c *gin.Context) {
 	}
 
 	replacesDocumentID := c.PostForm("replaces_document_id")
-
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in token"})
-		return
-	}
+	folderID := c.PostForm("folder_id")
+	userID := c.GetString("user_id") // From JWT middleware
 
 	// Call usecase
-	documentID, err := h.docUsecase.UploadDocument(c.Request.Context(), userID.(string), file, replacesDocumentID)
+	documentID, err := h.docUsecase.UploadDocument(c.Request.Context(), userID, file, folderID, replacesDocumentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -184,6 +180,10 @@ func (h *DocumentHandler) List(c *gin.Context) {
 	if isDepStr := c.Query("is_deprecated"); isDepStr != "" {
 		isDep := isDepStr == "true"
 		filter.IsDeprecated = &isDep
+	}
+
+	if fID := c.Query("folder_id"); fID != "" {
+		filter.FolderID = &fID
 	}
 
 	docs, total, err := h.docUsecase.GetAllDocuments(c.Request.Context(), filter)
