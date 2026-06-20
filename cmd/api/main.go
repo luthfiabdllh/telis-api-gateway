@@ -68,14 +68,21 @@ func main() {
 	log.Println("Successfully initialized gRPC Agent Client")
 
 	// 4. Dependency Injection (Wiring)
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Failed to get sql.DB: %v", err)
+	}
+
 	// Repositories (Layer 3)
 	userRepo := repository.NewUserRepository(db)
 	redlineRepo := repository.NewRedlineRepository(db)
 	feedbackRepo := repository.NewFeedbackRepository(db)
+	metricsRepo := repository.NewMetricsRepository(sqlDB)
 
 	// Usecases (Layer 2)
 	authUsecase := usecase.NewAuthUsecase(userRepo, cfg)
 	feedbackUsecase := usecase.NewFeedbackUsecase(feedbackRepo)
+	metricsUsecase := usecase.NewMetricsUsecase(metricsRepo)
 	
 	// Base dir for shared documents
 	sharedDocsDir := "../shared_docs" // Assuming running from root of telis-api-gateway
@@ -83,7 +90,7 @@ func main() {
 	redlineUsecase := usecase.NewRedlineUsecase(redlineRepo, rmqPublisher, sharedDocsDir)
 
 	// 5. Setup Gin Router & Delivery Layer (Layer 4)
-	router := http.SetupRouter(cfg, authUsecase, docUsecase, redlineUsecase, feedbackUsecase, agentClient)
+	router := http.SetupRouter(cfg, authUsecase, docUsecase, redlineUsecase, feedbackUsecase, metricsUsecase, agentClient)
 
 	// 5. Start Server
 	log.Printf("Starting API Gateway on port %s", cfg.Port)

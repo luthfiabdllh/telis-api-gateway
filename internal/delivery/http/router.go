@@ -14,7 +14,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, feedbackUsecase domain.FeedbackUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
+func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, feedbackUsecase domain.FeedbackUsecase, metricsUsecase domain.MetricsUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
 	r := gin.Default()
 
 	// Health Check
@@ -43,6 +43,9 @@ func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase 
 			
 			// Feedback Routes
 			v1.NewFeedbackHandler(protected, feedbackUsecase)
+			
+			// Metrics Routes
+			v1.NewMetricsHandler(protected, metricsUsecase)
 
 			// Example Ping route accessible to everyone with a valid token
 			protected.GET("/ping", func(c *gin.Context) {
