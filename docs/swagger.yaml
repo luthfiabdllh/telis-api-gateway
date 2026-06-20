@@ -1,5 +1,65 @@
 basePath: /api/v1
 definitions:
+  domain.DailyUsage:
+    properties:
+      cost_usd:
+        type: number
+      date:
+        type: string
+      total_tokens:
+        type: integer
+    type: object
+  domain.DashboardMetrics:
+    properties:
+      daily_trend:
+        items:
+          $ref: '#/definitions/domain.DailyUsage'
+        type: array
+      top_users:
+        items:
+          $ref: '#/definitions/domain.UserCost'
+        type: array
+      total_cost_this_month:
+        type: number
+    type: object
+  domain.Document:
+    properties:
+      created_at:
+        type: string
+      file_size_bytes:
+        type: integer
+      filename:
+        type: string
+      folder_id:
+        type: string
+      id:
+        type: string
+      is_deprecated:
+        type: boolean
+      previous_version_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      uploaded_by:
+        type: string
+      version:
+        type: integer
+    type: object
+  domain.UserCost:
+    properties:
+      email:
+        description: Joined from users table
+        type: string
+      name:
+        description: Joined from users table
+        type: string
+      total_cost:
+        type: number
+      user_id:
+        type: string
+    type: object
   v1.ChatPayload:
     properties:
       document_filters:
@@ -214,6 +274,53 @@ paths:
       summary: Chat dengan Agen RAG (SSE)
       tags:
       - Chat
+  /documents:
+    get:
+      description: Mengambil daftar dokumen dengan fitur paginasi dan pencarian.
+      parameters:
+      - description: Limit (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      - description: Search by filename
+        in: query
+        name: search
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Filter by is_deprecated
+        in: query
+        name: is_deprecated
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ambil Daftar Dokumen
+      tags:
+      - Document
   /documents/{id}:
     delete:
       consumes:
@@ -254,6 +361,41 @@ paths:
       summary: Hapus Dokumen Permanen
       tags:
       - Document
+    get:
+      description: Mengambil detail metadata 1 dokumen berdasarkan ID.
+      parameters:
+      - description: ID Dokumen
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Document'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Detail Dokumen
+      tags:
+      - Document
   /documents/{id}/deprecate:
     post:
       consumes:
@@ -292,6 +434,42 @@ paths:
       security:
       - BearerAuth: []
       summary: Usangkan Dokumen
+      tags:
+      - Document
+  /documents/{id}/download:
+    get:
+      description: Mengunduh file fisik PDF dari dokumen yang tersimpan di sistem.
+      parameters:
+      - description: ID Dokumen
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Unduh PDF Dokumen
       tags:
       - Document
   /documents/upload:
@@ -337,6 +515,200 @@ paths:
       summary: Unggah Dokumen PDF
       tags:
       - Document
+  /folders:
+    get:
+      description: Mengambil daftar folder. Jika parent_id dikosongkan, akan mengambil
+        root folder.
+      parameters:
+      - description: ID Folder Induk (kosongkan untuk root)
+        in: query
+        name: parent_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Daftar Folder
+      tags:
+      - Folder
+    post:
+      consumes:
+      - application/json
+      description: Membuat folder baru. Bisa disarangkan ke dalam folder lain menggunakan
+        parent_id.
+      parameters:
+      - description: Payload Buat Folder (name, parent_id)
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Buat Folder Baru
+      tags:
+      - Folder
+  /folders/{id}:
+    delete:
+      description: Menghapus folder, seluruh sub-folder di dalamnya, beserta memicu
+        penghapusan dokumen secara permanen dari Storage, Qdrant, dan Neo4j.
+      parameters:
+      - description: ID Folder
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Hapus Folder (Cascading Delete)
+      tags:
+      - Folder
+    put:
+      consumes:
+      - application/json
+      description: Mengganti nama sebuah folder berdasarkan ID.
+      parameters:
+      - description: ID Folder
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Payload Ganti Nama (name)
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ganti Nama Folder
+      tags:
+      - Folder
+  /metrics/tokens:
+    get:
+      description: Mengambil total biaya LLM bulan ini, top 5 pengguna, dan tren penggunaan
+        harian.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.DashboardMetrics'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden (Bukan Admin)
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Dapatkan Dashboard Metrik Token (Khusus Admin)
+      tags:
+      - Metrics
+  /metrics/tokens/me:
+    get:
+      description: Mengambil total biaya LLM yang telah dihabiskan oleh pengguna yang
+        sedang login di bulan ini.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Dapatkan Metrik Token Saya Sendiri
+      tags:
+      - Metrics
   /redlines:
     post:
       consumes:

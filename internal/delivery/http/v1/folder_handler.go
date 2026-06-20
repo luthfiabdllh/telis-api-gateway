@@ -25,6 +25,18 @@ func NewFolderHandler(r *gin.RouterGroup, folderUsecase domain.FolderUsecase) {
 	}
 }
 
+// Create godoc
+// @Summary Buat Folder Baru
+// @Description Membuat folder baru. Bisa disarangkan ke dalam folder lain menggunakan parent_id.
+// @Tags Folder
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body map[string]interface{} true "Payload Buat Folder (name, parent_id)"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /folders [post]
 func (h *FolderHandler) Create(c *gin.Context) {
 	var req struct {
 		Name     string  `json:"name" binding:"required"`
@@ -49,6 +61,16 @@ func (h *FolderHandler) Create(c *gin.Context) {
 	})
 }
 
+// List godoc
+// @Summary Daftar Folder
+// @Description Mengambil daftar folder. Jika parent_id dikosongkan, akan mengambil root folder.
+// @Tags Folder
+// @Produce json
+// @Security BearerAuth
+// @Param parent_id query string false "ID Folder Induk (kosongkan untuk root)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /folders [get]
 func (h *FolderHandler) List(c *gin.Context) {
 	var parentID *string
 	if pid := c.Query("parent_id"); pid != "" {
@@ -66,6 +88,20 @@ func (h *FolderHandler) List(c *gin.Context) {
 	})
 }
 
+// Rename godoc
+// @Summary Ganti Nama Folder
+// @Description Mengganti nama sebuah folder berdasarkan ID.
+// @Tags Folder
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Folder"
+// @Param request body map[string]interface{} true "Payload Ganti Nama (name)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 404 {object} map[string]interface{} "Not Found"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /folders/{id} [put]
 func (h *FolderHandler) Rename(c *gin.Context) {
 	folderID := c.Param("id")
 	var req struct {
@@ -91,6 +127,16 @@ func (h *FolderHandler) Rename(c *gin.Context) {
 	})
 }
 
+// Delete godoc
+// @Summary Hapus Folder (Cascading Delete)
+// @Description Menghapus folder, seluruh sub-folder di dalamnya, beserta memicu penghapusan dokumen secara permanen dari Storage, Qdrant, dan Neo4j.
+// @Tags Folder
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Folder"
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /folders/{id} [delete]
 func (h *FolderHandler) Delete(c *gin.Context) {
 	folderID := c.Param("id")
 	userID := c.GetString("user_id")
