@@ -43,6 +43,25 @@ func (u *chatUsecase) GetMessages(ctx context.Context, sessionID uuid.UUID, user
 	return u.chatRepo.GetMessagesBySessionID(ctx, sessionID)
 }
 
+func (u *chatUsecase) RenameSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, newTitle string) error {
+	session, err := u.chatRepo.GetSessionByID(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	if session.UserID != userID {
+		return errors.New("unauthorized to rename this chat session")
+	}
+
+	// Sanitasi judul
+	newTitle = strings.TrimSpace(strings.ReplaceAll(newTitle, "\n", " "))
+	if newTitle == "" {
+		return errors.New("title cannot be empty")
+	}
+
+	return u.chatRepo.UpdateSessionTitle(ctx, sessionID, newTitle)
+}
+
 func (u *chatUsecase) DeleteSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID) error {
 	session, err := u.chatRepo.GetSessionByID(ctx, sessionID)
 	if err != nil {

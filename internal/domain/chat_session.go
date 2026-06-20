@@ -35,6 +35,7 @@ type ChatRepository interface {
 	CreateSession(ctx context.Context, session *ChatSession) error
 	GetSessionByID(ctx context.Context, id uuid.UUID) (*ChatSession, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]*ChatSession, error)
+	UpdateSessionTitle(ctx context.Context, id uuid.UUID, title string) error
 	DeleteSession(ctx context.Context, id uuid.UUID) error
 
 	CreateMessage(ctx context.Context, message *ChatMessage) error
@@ -44,6 +45,7 @@ type ChatRepository interface {
 type ChatUsecase interface {
 	GetSessions(ctx context.Context, userID uuid.UUID) ([]*ChatSession, error)
 	GetMessages(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID) ([]*ChatMessage, error)
+	RenameSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, newTitle string) error
 	DeleteSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID) error
 
 	// Called internally during stream

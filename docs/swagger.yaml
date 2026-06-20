@@ -137,6 +137,13 @@ definitions:
     - role_id
     - username
     type: object
+  v1.RenameSessionRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
+    type: object
   v1.SSOLoginRequest:
     properties:
       email:
@@ -456,6 +463,51 @@ paths:
       security:
       - BearerAuth: []
       summary: Histori Pesan Obrolan
+      tags:
+      - Chat
+  /chat/sessions/{id}/title:
+    put:
+      consumes:
+      - application/json
+      description: Mengubah judul sesi obrolan.
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Judul Baru
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/v1.RenameSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ubah Judul Obrolan
       tags:
       - Chat
   /chat/stream:

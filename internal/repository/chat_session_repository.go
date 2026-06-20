@@ -35,6 +35,10 @@ func (r *chatRepository) GetSessionsByUserID(ctx context.Context, userID uuid.UU
 	return sessions, err
 }
 
+func (r *chatRepository) UpdateSessionTitle(ctx context.Context, id uuid.UUID, title string) error {
+	return r.db.WithContext(ctx).Model(&domain.ChatSession{}).Where("id = ?", id).Update("title", title).Error
+}
+
 func (r *chatRepository) DeleteSession(ctx context.Context, id uuid.UUID) error {
 	// Karena di skema SQL ada ON DELETE CASCADE, menghapus session akan menghapus messages juga.
 	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.ChatSession{}).Error

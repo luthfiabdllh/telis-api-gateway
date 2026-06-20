@@ -30,6 +30,7 @@ func NewChatHandler(r *gin.RouterGroup, agentClient grpcClient.AgentClient, chat
 		chatRoutes.POST("/stream", handler.ChatStream)
 		chatRoutes.GET("/sessions", handler.GetSessions)
 		chatRoutes.GET("/sessions/:id/messages", handler.GetSessionMessages)
+		chatRoutes.PUT("/sessions/:id/title", handler.RenameSession)
 		chatRoutes.DELETE("/sessions/:id", handler.DeleteSession)
 	}
 }
@@ -195,6 +196,53 @@ func (h *ChatHandler) GetSessionMessages(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, messages)
+}
+
+type RenameSessionRequest struct {
+	Title string `json:"title" binding:"required"`
+}
+
+// RenameSession godoc
+// @Summary Ubah Judul Obrolan
+// @Description Mengubah judul sesi obrolan.
+// @Tags Chat
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Session ID"
+// @Param request body v1.RenameSessionRequest true "Judul Baru"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Router /chat/sessions/{id}/title [put]
+func (h *ChatHandler) RenameSession(c *gin.Context) {
+	userIDStr, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in token"})
+		return
+	}
+	userID, _ := uuid.Parse(userIDStr.(string))
+
+	sessionIDStr := c.Param("id")
+	sessionID, err := uuid.Parse(sessionIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		return
+	}
+
+	var req RenameSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.chatUsecase.RenameSession(c.Request.Context(), sessionID, userID, req.Title); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "session title updated successfully"})
 }
 
 // DeleteSession godoc
