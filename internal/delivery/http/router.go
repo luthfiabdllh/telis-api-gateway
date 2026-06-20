@@ -28,12 +28,13 @@ func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase 
 	// API V1 Group
 	apiV1 := r.Group("/api/v1")
 	{
-		// Auth Routes (Public)
-		v1.NewAuthHandler(apiV1, authUsecase)
-
 		// Protected Routes
-		protected := apiV1.Group("/")
+		protected := apiV1.Group("")
 		protected.Use(middleware.JWTAuthMiddleware(cfg))
+
+		// Auth Routes (Public & Protected)
+		v1.NewAuthHandler(apiV1, protected, authUsecase, cfg.InternalSSOSecret)
+
 		{
 			// Document Routes
 			v1.NewDocumentHandler(protected, docUsecase)

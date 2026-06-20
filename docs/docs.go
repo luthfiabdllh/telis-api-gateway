@@ -73,9 +73,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/register": {
+        "/auth/refresh": {
             "post": {
-                "description": "Mendaftarkan pengguna baru dengan Role tertentu (Admin, Legal, atau User).",
+                "description": "Memperbarui Access Token menggunakan Refresh Token",
                 "consumes": [
                     "application/json"
                 ],
@@ -85,7 +85,61 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Daftarkan pengguna baru",
+                "summary": "Refresh Token",
+                "parameters": [
+                    {
+                        "description": "Payload Refresh",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.RefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil refresh, mengembalikan token baru",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized (Token tidak valid)",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mendaftarkan pengguna baru dengan Role tertentu. Hanya user dengan Role Admin yang bisa mengeksekusi ini.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Daftarkan pengguna baru (Khusus Admin)",
                 "parameters": [
                     {
                         "description": "Payload Pendaftaran",
@@ -112,8 +166,71 @@ const docTemplate = `{
                             "additionalProperties": true
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden (Bukan Admin)",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
                     "409": {
                         "description": "Conflict (Email/Username sudah dipakai)",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/sso/google": {
+            "post": {
+                "description": "Login menggunakan email dari provider SSO (seperti Google). Memerlukan header X-Internal-Secret.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Login SSO (Internal Frontend Only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Internal Secret",
+                        "name": "X-Internal-Secret",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Payload SSO Login",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/v1.SSOLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil login, mengembalikan token",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized (Secret salah atau Akun tidak terdaftar)",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -1138,6 +1255,17 @@ const docTemplate = `{
                 }
             }
         },
+        "v1.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "v1.RegisterRequest": {
             "type": "object",
             "required": [
@@ -1158,6 +1286,17 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "v1.SSOLoginRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
                     "type": "string"
                 }
             }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
+
 	"telis-api-gateway/config"
 	"telis-api-gateway/internal/domain"
 	"telis-api-gateway/pkg/utils"
@@ -87,4 +89,88 @@ func (u *authUsecase) Login(ctx context.Context, email, password string) (string
 	}
 
 	return accessToken, refreshToken, nil
+}
+
+func (u *authUsecase) LoginSSO(ctx context.Context, email string) (string, string, error) {
+	// 1. Find user by email
+	user, err := u.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return "", "", err
+	}
+	if user == nil {
+		// Strict Whitelist: Jika tidak ada, tolak! Jangan auto-provision.
+		return "", "", errors.New("email is not registered. please contact admin to register your account first")
+	}
+
+	// 2. Generate Tokens
+	roleName := "User"
+	if user.Role.Name != "" {
+		roleName = user.Role.Name
+	}
+	
+	accessToken, refreshToken, err := utils.GenerateTokens(
+		user.ID, 
+		roleName, 
+		u.cfg.JWTSecret, 
+		u.cfg.JWTAccessExpMinutes, 
+		u.cfg.JWTRefreshExpDays,
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+func (u *authUsecase) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+	// 1. Validate the refresh token
+	claims, err := utils.ValidateToken(refreshToken, u.cfg.JWTSecret)
+	if err != nil {
+		return "", "", errors.New("invalid or expired refresh token")
+	}
+
+	// 2. Check token type
+	tokenType, ok := claims["type"].(string)
+	if !ok || tokenType != "refresh" {
+		return "", "", errors.New("invalid token type")
+	}
+
+	// 3. Extract user ID
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		return "", "", errors.New("invalid token claims")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return "", "", errors.New("invalid user id in token")
+	}
+
+	// 4. Verify user still exists
+	user, err := u.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return "", "", err
+	}
+	if user == nil {
+		return "", "", errors.New("user not found")
+	}
+
+	// 5. Generate new tokens
+	roleName := "User"
+	if user.Role.Name != "" {
+		roleName = user.Role.Name
+	}
+
+	newAccessToken, newRefreshToken, err := utils.GenerateTokens(
+		user.ID,
+		roleName,
+		u.cfg.JWTSecret,
+		u.cfg.JWTAccessExpMinutes,
+		u.cfg.JWTRefreshExpDays,
+	)
+	if err != nil {
+		return "", "", err
+	}
+
+	return newAccessToken, newRefreshToken, nil
 }
