@@ -14,7 +14,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, userUsecase domain.UserUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, feedbackUsecase domain.FeedbackUsecase, metricsUsecase domain.MetricsUsecase, folderUsecase domain.FolderUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
+func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, userUsecase domain.UserUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, feedbackUsecase domain.FeedbackUsecase, metricsUsecase domain.MetricsUsecase, folderUsecase domain.FolderUsecase, chatUsecase domain.ChatUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
 	r := gin.Default()
 
 	// Health Check
@@ -46,7 +46,7 @@ func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, userUsecase
 			v1.NewFolderHandler(protected, folderUsecase)
 
 			// Chat Routes
-			v1.NewChatHandler(protected, agentClient)
+			v1.NewChatHandler(protected, agentClient, chatUsecase)
 			
 			// Feedback Routes
 			v1.NewFeedbackHandler(protected, feedbackUsecase)

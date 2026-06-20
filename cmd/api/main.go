@@ -45,6 +45,8 @@ func main() {
 	// AutoMigrate database models
 	err = db.AutoMigrate(
 		&domain.UserFeedback{},
+		&domain.ChatSession{},
+		&domain.ChatMessage{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
@@ -80,6 +82,7 @@ func main() {
 	metricsRepo := repository.NewMetricsRepository(sqlDB)
 	documentRepo := repository.NewDocumentRepository(sqlDB)
 	folderRepo := repository.NewFolderRepository(sqlDB)
+	chatRepo := repository.NewChatRepository(db)
 
 	// Usecases (Layer 2)
 	userUsecase := usecase.NewUserUsecase(userRepo)
@@ -92,9 +95,10 @@ func main() {
 	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, documentRepo, sharedDocsDir)
 	folderUsecase := usecase.NewFolderUsecase(folderRepo, docUsecase)
 	redlineUsecase := usecase.NewRedlineUsecase(redlineRepo, rmqPublisher, sharedDocsDir)
+	chatUsecase := usecase.NewChatUsecase(chatRepo)
 
 	// 5. Setup Gin Router & Delivery Layer (Layer 4)
-	router := http.SetupRouter(cfg, authUsecase, userUsecase, docUsecase, redlineUsecase, feedbackUsecase, metricsUsecase, folderUsecase, agentClient)
+	router := http.SetupRouter(cfg, authUsecase, userUsecase, docUsecase, redlineUsecase, feedbackUsecase, metricsUsecase, folderUsecase, chatUsecase, agentClient)
 
 	// 5. Start Server
 	log.Printf("Starting API Gateway on port %s", cfg.Port)

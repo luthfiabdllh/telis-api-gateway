@@ -1,5 +1,32 @@
 basePath: /api/v1
 definitions:
+  domain.ChatMessage:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      sender:
+        description: '"user" or "ai"'
+        type: string
+      session_id:
+        type: string
+    type: object
+  domain.ChatSession:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   domain.DailyUsage:
     properties:
       cost_usd:
@@ -337,6 +364,98 @@ paths:
       security:
       - BearerAuth: []
       summary: Kirim Umpan Balik (HITL)
+      tags:
+      - Chat
+  /chat/sessions:
+    get:
+      description: Mengambil daftar semua sesi chat milik pengguna yang sedang login.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.ChatSession'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Daftar Riwayat Obrolan
+      tags:
+      - Chat
+  /chat/sessions/{id}:
+    delete:
+      description: Menghapus seluruh sesi beserta riwayat pesannya.
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden (Bukan pemilik sesi)
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Hapus Sesi Obrolan
+      tags:
+      - Chat
+  /chat/sessions/{id}/messages:
+    get:
+      description: Mengambil riwayat pesan di dalam sesi tertentu.
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.ChatMessage'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden (Bukan pemilik sesi)
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Sesi tidak ditemukan
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Histori Pesan Obrolan
       tags:
       - Chat
   /chat/stream:
