@@ -9,6 +9,9 @@ import (
 	v1 "telis-api-gateway/internal/delivery/http/v1"
 	"telis-api-gateway/internal/domain"
 	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
+	
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, feedbackUsecase domain.FeedbackUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
@@ -18,6 +21,9 @@ func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, docUsecase 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Swagger UI Route
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// API V1 Group
 	apiV1 := r.Group("/api/v1")

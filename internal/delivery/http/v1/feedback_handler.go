@@ -30,6 +30,18 @@ type submitFeedbackRequest struct {
 	Comment   string `json:"comment"`
 }
 
+// SubmitFeedback godoc
+// @Summary Kirim Umpan Balik (HITL)
+// @Description Menyimpan rating jempol dan komentar dari user untuk evaluasi RAG (Data Flywheel). UserID diambil secara otomatis dari token JWT.
+// @Tags Chat
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body v1.submitFeedbackRequest true "Payload Feedback"
+// @Success 201 {object} map[string]interface{} "Feedback tersimpan"
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Router /chat/feedback [post]
 func (h *FeedbackHandler) SubmitFeedback(c *gin.Context) {
 	// Extract userID from context (set by AuthMiddleware)
 	userIDStr, exists := c.Get("userID")

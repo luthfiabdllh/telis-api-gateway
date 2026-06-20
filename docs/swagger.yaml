@@ -1,0 +1,425 @@
+basePath: /api/v1
+definitions:
+  v1.ChatPayload:
+    properties:
+      document_filters:
+        items:
+          type: string
+        type: array
+      llm_temperature:
+        type: number
+      message:
+        type: string
+      session_id:
+        type: string
+    required:
+    - message
+    - session_id
+    type: object
+  v1.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  v1.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role_id:
+        type: integer
+      username:
+        type: string
+    required:
+    - email
+    - password
+    - role_id
+    - username
+    type: object
+  v1.submitFeedbackRequest:
+    properties:
+      comment:
+        type: string
+      message_id:
+        type: string
+      rating:
+        type: integer
+    required:
+    - message_id
+    - rating
+    type: object
+host: localhost:8000
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Ini adalah dokumentasi API Gateway untuk proyek TELIS (Telkom Legal
+    Intelligence System).
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: TELIS API Gateway
+  version: "3.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Menghasilkan JWT Access Token dan Refresh Token jika kredensial
+        valid.
+      parameters:
+      - description: Payload Login
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/v1.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil login, mengembalikan token
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized (Password salah atau user tidak ada)
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Login pengguna
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Mendaftarkan pengguna baru dengan Role tertentu (Admin, Legal,
+        atau User).
+      parameters:
+      - description: Payload Pendaftaran
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/v1.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Berhasil didaftarkan
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict (Email/Username sudah dipakai)
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Daftarkan pengguna baru
+      tags:
+      - Auth
+  /chat/feedback:
+    post:
+      consumes:
+      - application/json
+      description: Menyimpan rating jempol dan komentar dari user untuk evaluasi RAG
+        (Data Flywheel). UserID diambil secara otomatis dari token JWT.
+      parameters:
+      - description: Payload Feedback
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/v1.submitFeedbackRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Feedback tersimpan
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Kirim Umpan Balik (HITL)
+      tags:
+      - Chat
+  /chat/stream:
+    post:
+      consumes:
+      - application/json
+      description: Mengirim pesan ke AI Agent dan menerima respons secara streaming
+        (Server-Sent Events).
+      parameters:
+      - description: Payload Chat
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/v1.ChatPayload'
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: Server-Sent Events stream
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "502":
+          description: Bad Gateway (Agent mati)
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Chat dengan Agen RAG (SSE)
+      tags:
+      - Chat
+  /documents/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus dokumen PDF, Vektor di Qdrant, dan entitas di Neo4j secara
+        permanen.
+      parameters:
+      - description: ID Dokumen
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Perintah penghapusan masuk antrean
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Hapus Dokumen Permanen
+      tags:
+      - Document
+  /documents/{id}/deprecate:
+    post:
+      consumes:
+      - application/json
+      description: Mengusangkan dokumen lama (mencabut vektor & graph) tanpa menghapus
+        file fisiknya.
+      parameters:
+      - description: ID Dokumen
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Perintah pengusangan masuk antrean
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Usangkan Dokumen
+      tags:
+      - Document
+  /documents/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Mengunggah dokumen PDF untuk diproses oleh Celery Ingestion Worker.
+      parameters:
+      - description: File PDF Dokumen Hukum
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: ID Dokumen versi lama jika dokumen ini adalah revisi
+        in: formData
+        name: replaces_document_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Diterima dan masuk antrean
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Unggah Dokumen PDF
+      tags:
+      - Document
+  /redlines:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Mengunggah dokumen source dan target untuk proses komparasi klausul
+        dan redlining.
+      parameters:
+      - description: File PDF Kontrak Lama (Source)
+        in: formData
+        name: source_file
+        required: true
+        type: file
+      - description: File PDF Kontrak Baru (Target)
+        in: formData
+        name: target_file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Proses komparasi berhasil di-antrekan
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Unggah Dokumen Redline
+      tags:
+      - Redline
+  /redlines/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil status (PENDING/PROCESSING/COMPLETED/FAILED) dan hasil
+        komparasi kontrak berdasarkan Job ID.
+      parameters:
+      - description: Redline Job ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Status & Hasil Redline
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found (Job ID tidak ada)
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Ambil Status & Hasil Redline
+      tags:
+      - Redline
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

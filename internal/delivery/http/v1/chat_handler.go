@@ -33,6 +33,19 @@ type ChatPayload struct {
 	LLMTemperature  float32  `json:"llm_temperature"`
 }
 
+// ChatStream godoc
+// @Summary Chat dengan Agen RAG (SSE)
+// @Description Mengirim pesan ke AI Agent dan menerima respons secara streaming (Server-Sent Events).
+// @Tags Chat
+// @Accept json
+// @Produce text/event-stream
+// @Security BearerAuth
+// @Param request body v1.ChatPayload true "Payload Chat"
+// @Success 200 {string} string "Server-Sent Events stream"
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 502 {object} map[string]interface{} "Bad Gateway (Agent mati)"
+// @Router /chat/stream [post]
 func (h *ChatHandler) ChatStream(c *gin.Context) {
 	// 1. Validate JWT
 	userID, exists := c.Get("user_id")

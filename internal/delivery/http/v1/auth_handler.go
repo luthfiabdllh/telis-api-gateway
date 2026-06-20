@@ -30,6 +30,17 @@ type RegisterRequest struct {
 	RoleID   int    `json:"role_id" binding:"required"`
 }
 
+// Register godoc
+// @Summary Daftarkan pengguna baru
+// @Description Mendaftarkan pengguna baru dengan Role tertentu (Admin, Legal, atau User).
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body v1.RegisterRequest true "Payload Pendaftaran"
+// @Success 201 {object} map[string]interface{} "Berhasil didaftarkan"
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 409 {object} map[string]interface{} "Conflict (Email/Username sudah dipakai)"
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -58,6 +69,17 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// Login godoc
+// @Summary Login pengguna
+// @Description Menghasilkan JWT Access Token dan Refresh Token jika kredensial valid.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body v1.LoginRequest true "Payload Login"
+// @Success 200 {object} map[string]interface{} "Berhasil login, mengembalikan token"
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized (Password salah atau user tidak ada)"
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
