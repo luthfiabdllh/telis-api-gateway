@@ -17,14 +17,48 @@ import (
 
 type documentUsecase struct {
 	publisher rabbitmq.Publisher
+	repo      domain.DocumentRepository
 	baseDir   string // e.g. ../shared_docs
 }
 
-func NewDocumentUsecase(publisher rabbitmq.Publisher, baseDir string) domain.DocumentUsecase {
+func NewDocumentUsecase(publisher rabbitmq.Publisher, repo domain.DocumentRepository, baseDir string) domain.DocumentUsecase {
 	return &documentUsecase{
 		publisher: publisher,
+		repo:      repo,
 		baseDir:   baseDir,
 	}
+}
+
+func (u *documentUsecase) GetAllDocuments(ctx context.Context, filter domain.DocumentFilter) ([]domain.Document, int, error) {
+	return u.repo.GetAll(ctx, filter)
+}
+
+func (u *documentUsecase) GetDocumentByID(ctx context.Context, documentID string) (*domain.Document, error) {
+	doc, err := u.repo.GetByID(ctx, documentID)
+	if err != nil {
+		return nil, err
+	}
+	if doc == nil {
+		return nil, errors.New("document not found")
+	}
+	return doc, nil
+}
+
+func (u *documentUsecase) GetDocumentFilePath(ctx context.Context, documentID string) (string, string, error) {
+	doc, err := u.repo.GetByID(ctx, documentID)
+	if err != nil {
+		return "", "", err
+	}
+	if doc == nil {
+		return "", "", errors.New("document not found")
+	}
+
+	// We only return the file path and filename. The path is relative to ingestion.
+	// But in Gateway, the physical file is at u.baseDir / {documentID}_{filename}
+	fileName := fmt.Sprintf("%s_%s", documentID, doc.Filename)
+	fullPath := filepath.Join(u.baseDir, fileName)
+
+	return fullPath, doc.Filename, nil
 }
 
 func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, replacesDocumentID string) (string, error) {

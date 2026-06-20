@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,10 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 
 	docRoutes := r.Group("/documents")
 	{
+		docRoutes.GET("/", handler.List)
+		docRoutes.GET("/:id", handler.GetByID)
+		docRoutes.GET("/:id/download", handler.Download)
+		
 		docRoutes.POST("/upload", handler.Upload)
 		docRoutes.DELETE("/:id", handler.Delete)
 		docRoutes.POST("/:id/deprecate", handler.Deprecate)
@@ -141,4 +146,108 @@ func (h *DocumentHandler) Deprecate(c *gin.Context) {
 		"message":     "document deprecation queued",
 		"document_id": documentID,
 	})
+}
+
+// List godoc
+// @Summary Ambil Daftar Dokumen
+// @Description Mengambil daftar dokumen dengan fitur paginasi dan pencarian.
+// @Tags Document
+// @Produce json
+// @Security BearerAuth
+// @Param limit query int false "Limit (default 10)"
+// @Param offset query int false "Offset (default 0)"
+// @Param search query string false "Search by filename"
+// @Param status query string false "Filter by status"
+// @Param is_deprecated query bool false "Filter by is_deprecated"
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents [get]
+func (h *DocumentHandler) List(c *gin.Context) {
+	limit := 10
+	offset := 0
+
+	if l := c.Query("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+	if o := c.Query("offset"); o != "" {
+		fmt.Sscanf(o, "%d", &offset)
+	}
+
+	filter := domain.DocumentFilter{
+		Limit:  limit,
+		Offset: offset,
+		Search: c.Query("search"),
+		Status: c.Query("status"),
+	}
+
+	if isDepStr := c.Query("is_deprecated"); isDepStr != "" {
+		isDep := isDepStr == "true"
+		filter.IsDeprecated = &isDep
+	}
+
+	docs, total, err := h.docUsecase.GetAllDocuments(c.Request.Context(), filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  docs,
+		"total": total,
+	})
+}
+
+// GetByID godoc
+// @Summary Detail Dokumen
+// @Description Mengambil detail metadata 1 dokumen berdasarkan ID.
+// @Tags Document
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Success 200 {object} domain.Document
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 404 {object} map[string]interface{} "Not Found"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id} [get]
+func (h *DocumentHandler) GetByID(c *gin.Context) {
+	documentID := c.Param("id")
+	doc, err := h.docUsecase.GetDocumentByID(c.Request.Context(), documentID)
+	if err != nil {
+		if err.Error() == "document not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, doc)
+}
+
+// Download godoc
+// @Summary Unduh PDF Dokumen
+// @Description Mengunduh file fisik PDF dari dokumen yang tersimpan di sistem.
+// @Tags Document
+// @Produce application/pdf
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Success 200 {file} file
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 404 {object} map[string]interface{} "Not Found"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id}/download [get]
+func (h *DocumentHandler) Download(c *gin.Context) {
+	documentID := c.Param("id")
+	fullPath, filename, err := h.docUsecase.GetDocumentFilePath(c.Request.Context(), documentID)
+	if err != nil {
+		if err.Error() == "document not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.FileAttachment(fullPath, filename)
 }
