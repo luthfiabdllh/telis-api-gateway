@@ -12,10 +12,18 @@ import (
 	
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/gin-contrib/cors"
 )
 
 func SetupRouter(cfg *config.Config, authUsecase domain.AuthUsecase, userUsecase domain.UserUsecase, docUsecase domain.DocumentUsecase, redlineUsecase domain.RedlineUsecase, feedbackUsecase domain.FeedbackUsecase, metricsUsecase domain.MetricsUsecase, folderUsecase domain.FolderUsecase, chatUsecase domain.ChatUsecase, agentClient grpcClient.AgentClient) *gin.Engine {
 	r := gin.Default()
+
+	// Enable CORS
+	configCORS := cors.DefaultConfig()
+	configCORS.AllowAllOrigins = true
+	configCORS.AllowCredentials = true
+	configCORS.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Accept"}
+	r.Use(cors.New(configCORS))
 
 	// Health Check
 	r.GET("/health", func(c *gin.Context) {
