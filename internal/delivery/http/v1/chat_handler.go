@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -109,26 +110,55 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 
 	// Buffer to store AI full response
 	fullAIResponse := ""
+	isStreamCompleted := false
+
+	// [NEW] Defer ensures the partial response is ALWAYS saved, even if the user refreshes/disconnects
+	defer func() {
+		if fullAIResponse != "" {
+			if !isStreamCompleted {
+				fullAIResponse += "\n\n*[Teks terputus karena koneksi]*"
+			}
+			_ = h.chatUsecase.SaveMessage(context.Background(), req.SessionID, "ai", fullAIResponse)
+		}
+	}()
+
+	// Helper function for W3C-compliant SSE
+	writeSSE := func(w io.Writer, event string, data string) {
+		fmt.Fprintf(w, "event: %s\n", event)
+		if len(data) > 0 {
+			lines := strings.Split(data, "\n")
+			for _, line := range lines {
+				fmt.Fprintf(w, "data: %s\n", line)
+			}
+		}
+		fmt.Fprintf(w, "\n")
+	}
 
 	// 5. Read from gRPC Stream and write to HTTP SSE
 	c.Stream(func(w io.Writer) bool {
 		resp, err := stream.Recv()
 		if err == io.EOF {
+			isStreamCompleted = true
 			return false // End of stream
 		}
 		if err != nil {
-			c.SSEvent("error", err.Error())
+			writeSSE(w, "error", err.Error())
 			return false
 		}
 
-		c.SSEvent("message", resp.ContentChunk)
+		if resp.EventType == "status" {
+			writeSSE(w, "status", resp.ContentChunk)
+			c.Writer.Flush()
+			return true
+		}
+
+		writeSSE(w, "message", resp.ContentChunk)
 		fullAIResponse += resp.ContentChunk
 
 		// Check if it's final
-		if resp.IsFinal {
-			c.SSEvent("done", "[DONE]")
-			// [NEW] Save AI message when stream is done
-			_ = h.chatUsecase.SaveMessage(context.Background(), req.SessionID, "ai", fullAIResponse)
+		if resp.IsFinal || resp.EventType == "done" {
+			writeSSE(w, "done", "[DONE]")
+			isStreamCompleted = true
 			return false
 		}
 

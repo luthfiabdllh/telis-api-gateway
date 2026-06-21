@@ -14,6 +14,7 @@ message ChatRequest {
 message ChatResponse {
     string content_chunk = 1; // Streamed text chunk
     bool is_final = 2;        // Flag indicating if this is the last chunk
+    string event_type = 3;    // "status", "message", or "done"
 }
 
 service AgentService {
