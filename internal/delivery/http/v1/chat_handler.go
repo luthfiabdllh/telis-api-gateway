@@ -152,6 +152,12 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 			return true
 		}
 
+		if resp.EventType == "sources" {
+			writeSSE(w, "sources", resp.ContentChunk)
+			c.Writer.Flush()
+			return true
+		}
+
 		writeSSE(w, "message", resp.ContentChunk)
 		fullAIResponse += resp.ContentChunk
 
