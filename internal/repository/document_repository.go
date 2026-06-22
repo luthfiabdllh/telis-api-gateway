@@ -123,3 +123,31 @@ func (r *documentRepository) GetByID(ctx context.Context, id string) (*domain.Do
 
 	return &doc, nil
 }
+
+func (r *documentRepository) UpdateMetadata(ctx context.Context, id string, filename *string, folderID *string) error {
+	query := "UPDATE ingestion.documents SET updated_at = CURRENT_TIMESTAMP"
+	var args []interface{}
+	argCount := 1
+
+	if filename != nil {
+		query += fmt.Sprintf(", filename = $%d", argCount)
+		args = append(args, *filename)
+		argCount++
+	}
+
+	if folderID != nil {
+		query += fmt.Sprintf(", folder_id = $%d", argCount)
+		if *folderID == "null" || *folderID == "" {
+			args = append(args, nil)
+		} else {
+			args = append(args, *folderID)
+		}
+		argCount++
+	}
+
+	query += fmt.Sprintf(" WHERE id = $%d", argCount)
+	args = append(args, id)
+
+	_, err := r.db.ExecContext(ctx, query, args...)
+	return err
+}

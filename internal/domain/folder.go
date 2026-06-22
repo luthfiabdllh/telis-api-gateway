@@ -23,11 +23,16 @@ type FolderRepository interface {
 	Update(ctx context.Context, id string, name string) error
 	Delete(ctx context.Context, id string) error
 	GetAllDocumentsInFolderAndSubfolders(ctx context.Context, folderID string) ([]string, error) // Returns document IDs
+	Move(ctx context.Context, id string, parentID *string) error
+	GetPath(ctx context.Context, id string) ([]Folder, error)
 }
 
 type FolderUsecase interface {
 	CreateFolder(ctx context.Context, userID string, name string, parentID *string) (*Folder, error)
 	GetFolders(ctx context.Context, parentID *string) ([]Folder, error)
+	GetFolderByID(ctx context.Context, id string) (*Folder, error)
 	RenameFolder(ctx context.Context, id string, name string) error
+	MoveFolder(ctx context.Context, id string, parentID *string) error
+	GetFolderPath(ctx context.Context, id string) ([]Folder, error)
 	DeleteFolder(ctx context.Context, id string, userID string) error
 }

@@ -141,3 +141,33 @@ func (u *documentUsecase) DeleteDocument(ctx context.Context, documentID string,
 
 	return nil
 }
+
+func (u *documentUsecase) RenameDocument(ctx context.Context, documentID string, newName string) error {
+	if len(newName) < 4 || newName[len(newName)-4:] != ".pdf" {
+		newName = newName + ".pdf"
+	}
+	
+	doc, err := u.repo.GetByID(ctx, documentID)
+	if err != nil {
+		return err
+	}
+	if doc == nil {
+		return errors.New("document not found")
+	}
+
+	oldFileName := fmt.Sprintf("%s_%s", documentID, doc.Filename)
+	oldPath := filepath.Join(u.baseDir, oldFileName)
+	
+	newFileName := fmt.Sprintf("%s_%s", documentID, newName)
+	newPath := filepath.Join(u.baseDir, newFileName)
+
+	if err := os.Rename(oldPath, newPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to rename physical file: %v", err)
+	}
+
+	return u.repo.UpdateMetadata(ctx, documentID, &newName, nil)
+}
+
+func (u *documentUsecase) MoveDocument(ctx context.Context, documentID string, newFolderID *string) error {
+	return u.repo.UpdateMetadata(ctx, documentID, nil, newFolderID)
+}

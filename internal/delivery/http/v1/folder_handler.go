@@ -20,7 +20,10 @@ func NewFolderHandler(r *gin.RouterGroup, folderUsecase domain.FolderUsecase) {
 	{
 		folderRoutes.POST("", handler.Create)
 		folderRoutes.GET("", handler.List)
+		folderRoutes.GET("/:id", handler.GetByID)
+		folderRoutes.GET("/:id/path", handler.GetPath)
 		folderRoutes.PUT("/:id", handler.Rename)
+		folderRoutes.PUT("/:id/move", handler.Move)
 		folderRoutes.DELETE("/:id", handler.Delete)
 	}
 }
@@ -149,5 +152,93 @@ func (h *FolderHandler) Delete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "folder and its contents deleted successfully",
+	})
+}
+
+// GetByID godoc
+// @Summary Detail Folder
+// @Description Mengambil detail metadata folder.
+// @Tags Folder
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Folder"
+// @Success 200 {object} domain.Folder
+// @Failure 404 {object} map[string]interface{} "Not Found"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /folders/{id} [get]
+func (h *FolderHandler) GetByID(c *gin.Context) {
+	folderID := c.Param("id")
+	folder, err := h.folderUsecase.GetFolderByID(c.Request.Context(), folderID)
+	if err != nil {
+		if err.Error() == "folder not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, folder)
+}
+
+// GetPath godoc
+// @Summary Ambil Jalur (Breadcrumbs) Folder
+// @Description Mengambil urutan folder dari root hingga folder target.
+// @Tags Folder
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Folder Target"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{} "Not Found"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /folders/{id}/path [get]
+func (h *FolderHandler) GetPath(c *gin.Context) {
+	folderID := c.Param("id")
+	path, err := h.folderUsecase.GetFolderPath(c.Request.Context(), folderID)
+	if err != nil {
+		if err.Error() == "folder not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": path,
+	})
+}
+
+// Move godoc
+// @Summary Pindahkan Folder
+// @Description Memindahkan folder ke folder lain. parent_id bisa null untuk memindahkan ke root.
+// @Tags Folder
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Folder"
+// @Param request body map[string]interface{} true "Payload Pindah (parent_id)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /folders/{id}/move [put]
+func (h *FolderHandler) Move(c *gin.Context) {
+	folderID := c.Param("id")
+	var req struct {
+		ParentID *string `json:"parent_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.folderUsecase.MoveFolder(c.Request.Context(), folderID, req.ParentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "folder moved successfully",
 	})
 }

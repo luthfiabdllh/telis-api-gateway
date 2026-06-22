@@ -26,6 +26,8 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.POST("/upload", handler.Upload)
 		docRoutes.DELETE("/:id", handler.Delete)
 		docRoutes.POST("/:id/deprecate", handler.Deprecate)
+		docRoutes.PUT("/:id/rename", handler.Rename)
+		docRoutes.PUT("/:id/move", handler.Move)
 	}
 }
 
@@ -251,3 +253,77 @@ func (h *DocumentHandler) Download(c *gin.Context) {
 
 	c.FileAttachment(fullPath, filename)
 }
+
+// Rename godoc
+// @Summary Ganti Nama Dokumen
+// @Description Mengganti nama sebuah dokumen berdasarkan ID (otomatis ditambah .pdf jika belum ada).
+// @Tags Document
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Param request body map[string]interface{} true "Payload Ganti Nama (name)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 404 {object} map[string]interface{} "Not Found"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id}/rename [put]
+func (h *DocumentHandler) Rename(c *gin.Context) {
+	documentID := c.Param("id")
+	var req struct {
+		Name string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.docUsecase.RenameDocument(c.Request.Context(), documentID, req.Name)
+	if err != nil {
+		if err.Error() == "document not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "document renamed successfully",
+	})
+}
+
+// Move godoc
+// @Summary Pindahkan Dokumen
+// @Description Memindahkan dokumen ke folder lain berdasarkan ID.
+// @Tags Document
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Param request body map[string]interface{} true "Payload Pindah (folder_id)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id}/move [put]
+func (h *DocumentHandler) Move(c *gin.Context) {
+	documentID := c.Param("id")
+	var req struct {
+		FolderID *string `json:"folder_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.docUsecase.MoveDocument(c.Request.Context(), documentID, req.FolderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "document moved successfully",
+	})
+}
+

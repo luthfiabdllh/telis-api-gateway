@@ -105,3 +105,47 @@ func (r *folderRepository) GetAllDocumentsInFolderAndSubfolders(ctx context.Cont
 	}
 	return docIDs, nil
 }
+
+func (r *folderRepository) Move(ctx context.Context, id string, parentID *string) error {
+	query := `UPDATE ingestion.folders SET parent_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`
+	var pID interface{}
+	if parentID == nil || *parentID == "null" || *parentID == "" {
+		pID = nil
+	} else {
+		pID = *parentID
+	}
+	_, err := r.db.ExecContext(ctx, query, pID, id)
+	return err
+}
+
+func (r *folderRepository) GetPath(ctx context.Context, id string) ([]domain.Folder, error) {
+	query := `
+		WITH RECURSIVE path AS (
+			SELECT id, name, parent_id, created_by, created_at, updated_at, 1 as level
+			FROM ingestion.folders
+			WHERE id = $1
+			UNION ALL
+			SELECT f.id, f.name, f.parent_id, f.created_by, f.created_at, f.updated_at, p.level + 1
+			FROM ingestion.folders f
+			INNER JOIN path p ON f.id = p.parent_id
+		)
+		SELECT id, name, parent_id, created_by, created_at, updated_at
+		FROM path
+		ORDER BY level DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var path []domain.Folder
+	for rows.Next() {
+		var f domain.Folder
+		if err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			return nil, err
+		}
+		path = append(path, f)
+	}
+	return path, nil
+}

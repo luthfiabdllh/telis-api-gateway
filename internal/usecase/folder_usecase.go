@@ -94,3 +94,52 @@ func (u *folderUsecase) DeleteFolder(ctx context.Context, id string, userID stri
 	// 3. Delete the folder itself (ON DELETE CASCADE will drop subfolders and DB rows for documents)
 	return u.folderRepo.Delete(ctx, id)
 }
+
+func (u *folderUsecase) GetFolderByID(ctx context.Context, id string) (*domain.Folder, error) {
+	folder, err := u.folderRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if folder == nil {
+		return nil, errors.New("folder not found")
+	}
+	return folder, nil
+}
+
+func (u *folderUsecase) MoveFolder(ctx context.Context, id string, parentID *string) error {
+	folder, err := u.folderRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if folder == nil {
+		return errors.New("folder not found")
+	}
+
+	if parentID != nil && *parentID != "" && *parentID != "null" {
+		pID, err := uuid.Parse(*parentID)
+		if err != nil {
+			return errors.New("invalid parent id")
+		}
+		pFolder, err := u.folderRepo.GetByID(ctx, pID.String())
+		if err != nil {
+			return err
+		}
+		if pFolder == nil {
+			return errors.New("parent folder not found")
+		}
+	}
+
+	return u.folderRepo.Move(ctx, id, parentID)
+}
+
+func (u *folderUsecase) GetFolderPath(ctx context.Context, id string) ([]domain.Folder, error) {
+	path, err := u.folderRepo.GetPath(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(path) == 0 {
+		return nil, errors.New("folder not found")
+	}
+	return path, nil
+}
+
