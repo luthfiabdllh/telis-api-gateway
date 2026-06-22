@@ -20,6 +20,7 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 	docRoutes := r.Group("/documents")
 	{
 		docRoutes.GET("", handler.List)
+		docRoutes.GET("/", handler.List)
 		docRoutes.GET("/:id", handler.GetByID)
 		docRoutes.GET("/:id/download", handler.Download)
 		

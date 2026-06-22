@@ -14,8 +14,8 @@ type Document struct {
 	Filename          string     `json:"filename"`
 	FilePath          string     `json:"-"` // Hide file path from API
 	Status            string     `json:"status"`
-	UploadedBy        uuid.UUID  `json:"uploaded_by"`
-	FileSizeBytes     int64      `json:"file_size_bytes"`
+	UploadedBy        *uuid.UUID `json:"uploaded_by,omitempty"`
+	FileSizeBytes     *int64     `json:"file_size_bytes,omitempty"`
 	IsDeprecated      bool       `json:"is_deprecated"`
 	PreviousVersionID *uuid.UUID `json:"previous_version_id,omitempty"`
 	Version           int        `json:"version"`
