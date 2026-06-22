@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -148,7 +149,8 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 		}
 
 		if resp.EventType == "status" {
-			writeSSE(w, "status", resp.ContentChunk)
+			b, _ := json.Marshal(resp.ContentChunk)
+			writeSSE(w, "status", string(b))
 			c.Writer.Flush()
 			return true
 		}
@@ -160,7 +162,8 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 			return true
 		}
 
-		writeSSE(w, "message", resp.ContentChunk)
+		b, _ := json.Marshal(resp.ContentChunk)
+		writeSSE(w, "message", string(b))
 		fullAIResponse += resp.ContentChunk
 
 		// Check if it's final
