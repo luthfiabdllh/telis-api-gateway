@@ -18,36 +18,50 @@ func NewDocumentRepository(db *sql.DB) domain.DocumentRepository {
 }
 
 func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentFilter) ([]domain.Document, int, error) {
-	query := `SELECT id, folder_id, filename, file_path, status, uploaded_by, file_size_bytes, is_deprecated, previous_version_id, version, created_at, updated_at FROM ingestion.documents WHERE 1=1`
-	countQuery := `SELECT count(*) FROM ingestion.documents WHERE 1=1`
+	query := `
+		WITH RECURSIVE folder_tree AS (
+			SELECT id, name, parent_id, name::text as folder_path
+			FROM ingestion.folders
+			WHERE parent_id IS NULL
+			UNION ALL
+			SELECT f.id, f.name, f.parent_id, (ft.folder_path || ' > ' || f.name)
+			FROM ingestion.folders f
+			INNER JOIN folder_tree ft ON f.parent_id = ft.id
+		)
+		SELECT d.id, d.folder_id, d.filename, d.file_path, d.status, d.uploaded_by, d.file_size_bytes, d.is_deprecated, d.previous_version_id, d.version, d.created_at, d.updated_at, COALESCE(ft.folder_path, '') as folder_path
+		FROM ingestion.documents d
+		LEFT JOIN folder_tree ft ON d.folder_id = ft.id
+		WHERE 1=1
+	`
+	countQuery := `SELECT count(*) FROM ingestion.documents d WHERE 1=1`
 
 	var conditions []string
 	var args []interface{}
 	argId := 1
 
 	if filter.Search != "" {
-		conditions = append(conditions, fmt.Sprintf("filename ILIKE $%d", argId))
+		conditions = append(conditions, fmt.Sprintf("d.filename ILIKE $%d", argId))
 		args = append(args, "%"+filter.Search+"%")
 		argId++
 	}
 
 	if filter.Status != "" {
-		conditions = append(conditions, fmt.Sprintf("status = $%d", argId))
+		conditions = append(conditions, fmt.Sprintf("d.status = $%d", argId))
 		args = append(args, filter.Status)
 		argId++
 	}
 
 	if filter.IsDeprecated != nil {
-		conditions = append(conditions, fmt.Sprintf("is_deprecated = $%d", argId))
+		conditions = append(conditions, fmt.Sprintf("d.is_deprecated = $%d", argId))
 		args = append(args, *filter.IsDeprecated)
 		argId++
 	}
 
 	if filter.FolderID != nil {
 		if *filter.FolderID == "null" || *filter.FolderID == "" {
-			conditions = append(conditions, "folder_id IS NULL")
+			conditions = append(conditions, "d.folder_id IS NULL")
 		} else {
-			conditions = append(conditions, fmt.Sprintf("folder_id = $%d", argId))
+			conditions = append(conditions, fmt.Sprintf("d.folder_id = $%d", argId))
 			args = append(args, *filter.FolderID)
 			argId++
 		}
@@ -67,7 +81,7 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 	}
 
 	// Add Order and Pagination
-	query += " ORDER BY created_at DESC"
+	query += " ORDER BY d.created_at DESC"
 
 	if filter.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", argId)
@@ -93,7 +107,7 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 		err := rows.Scan(
 			&doc.ID, &doc.FolderID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
 			&doc.FileSizeBytes, &doc.IsDeprecated, &doc.PreviousVersionID,
-			&doc.Version, &doc.CreatedAt, &doc.UpdatedAt,
+			&doc.Version, &doc.CreatedAt, &doc.UpdatedAt, &doc.FolderPath,
 		)
 		if err != nil {
 			return nil, 0, err

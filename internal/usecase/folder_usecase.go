@@ -60,8 +60,8 @@ func (u *folderUsecase) CreateFolder(ctx context.Context, userID string, name st
 	return folder, nil
 }
 
-func (u *folderUsecase) GetFolders(ctx context.Context, parentID *string) ([]domain.Folder, error) {
-	return u.folderRepo.GetAll(ctx, parentID)
+func (u *folderUsecase) GetFolders(ctx context.Context, parentID *string, search string) ([]domain.Folder, error) {
+	return u.folderRepo.GetAll(ctx, parentID, search)
 }
 
 func (u *folderUsecase) RenameFolder(ctx context.Context, id string, name string) error {

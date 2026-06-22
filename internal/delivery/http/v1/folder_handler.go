@@ -76,11 +76,16 @@ func (h *FolderHandler) Create(c *gin.Context) {
 // @Router /folders [get]
 func (h *FolderHandler) List(c *gin.Context) {
 	var parentID *string
-	if pid := c.Query("parent_id"); pid != "" {
-		parentID = &pid
+	isGlobal := c.Query("is_global") == "true"
+	if !isGlobal {
+		if pid := c.Query("parent_id"); pid != "" {
+			parentID = &pid
+		}
 	}
 
-	folders, err := h.folderUsecase.GetFolders(c.Request.Context(), parentID)
+	search := c.Query("search")
+
+	folders, err := h.folderUsecase.GetFolders(c.Request.Context(), parentID, search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

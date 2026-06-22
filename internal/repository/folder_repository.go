@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"telis-api-gateway/internal/domain"
 )
@@ -34,16 +35,39 @@ func (r *folderRepository) GetByID(ctx context.Context, id string) (*domain.Fold
 	return &f, nil
 }
 
-func (r *folderRepository) GetAll(ctx context.Context, parentID *string) ([]domain.Folder, error) {
-	query := `SELECT id, name, parent_id, created_by, created_at, updated_at FROM ingestion.folders WHERE 1=1`
+func (r *folderRepository) GetAll(ctx context.Context, parentID *string, search string) ([]domain.Folder, error) {
+	var query string
 	var args []interface{}
+	argCount := 1
+
+	if search != "" {
+		query = `
+			WITH RECURSIVE folder_tree AS (
+				SELECT id, name, parent_id, created_by, created_at, updated_at, name::text as folder_path
+				FROM ingestion.folders
+				WHERE parent_id IS NULL
+				UNION ALL
+				SELECT f.id, f.name, f.parent_id, f.created_by, f.created_at, f.updated_at, (ft.folder_path || ' > ' || f.name)
+				FROM ingestion.folders f
+				INNER JOIN folder_tree ft ON f.parent_id = ft.id
+			)
+			SELECT id, name, parent_id, created_by, created_at, updated_at, folder_path
+			FROM folder_tree
+			WHERE name ILIKE $1
+		`
+		args = append(args, "%"+search+"%")
+		argCount++
+	} else {
+		query = `SELECT id, name, parent_id, created_by, created_at, updated_at, '' as folder_path FROM ingestion.folders WHERE 1=1`
+	}
 
 	if parentID != nil {
 		if *parentID == "null" || *parentID == "" {
 			query += " AND parent_id IS NULL"
 		} else {
-			query += " AND parent_id = $1"
+			query += fmt.Sprintf(" AND parent_id = $%d", argCount)
 			args = append(args, *parentID)
+			argCount++
 		}
 	}
 
@@ -58,7 +82,7 @@ func (r *folderRepository) GetAll(ctx context.Context, parentID *string) ([]doma
 	var folders []domain.Folder
 	for rows.Next() {
 		var f domain.Folder
-		if err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt, &f.FolderPath); err != nil {
 			return nil, err
 		}
 		folders = append(folders, f)

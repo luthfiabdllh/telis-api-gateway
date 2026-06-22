@@ -184,8 +184,11 @@ func (h *DocumentHandler) List(c *gin.Context) {
 		filter.IsDeprecated = &isDep
 	}
 
-	if fID := c.Query("folder_id"); fID != "" {
-		filter.FolderID = &fID
+	isGlobal := c.Query("is_global") == "true"
+	if !isGlobal {
+		if fID := c.Query("folder_id"); fID != "" {
+			filter.FolderID = &fID
+		}
 	}
 
 	docs, total, err := h.docUsecase.GetAllDocuments(c.Request.Context(), filter)
