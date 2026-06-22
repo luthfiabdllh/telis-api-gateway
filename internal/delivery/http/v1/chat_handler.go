@@ -82,7 +82,7 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to initialize chat session"})
 		return
 	}
-	if err := h.chatUsecase.SaveMessage(c.Request.Context(), req.SessionID, "user", req.Message); err != nil {
+	if err := h.chatUsecase.SaveMessage(c.Request.Context(), req.SessionID, "user", req.Message, nil); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save user message"})
 		return
 	}
@@ -110,6 +110,7 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 
 	// Buffer to store AI full response
 	fullAIResponse := ""
+	var sourcesBytes []byte
 	isStreamCompleted := false
 
 	// [NEW] Defer ensures the partial response is ALWAYS saved, even if the user refreshes/disconnects
@@ -118,7 +119,7 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 			if !isStreamCompleted {
 				fullAIResponse += "\n\n*[Teks terputus karena koneksi]*"
 			}
-			_ = h.chatUsecase.SaveMessage(context.Background(), req.SessionID, "ai", fullAIResponse)
+			_ = h.chatUsecase.SaveMessage(context.Background(), req.SessionID, "ai", fullAIResponse, sourcesBytes)
 		}
 	}()
 
@@ -153,6 +154,7 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 		}
 
 		if resp.EventType == "sources" {
+			sourcesBytes = []byte(resp.ContentChunk)
 			writeSSE(w, "sources", resp.ContentChunk)
 			c.Writer.Flush()
 			return true

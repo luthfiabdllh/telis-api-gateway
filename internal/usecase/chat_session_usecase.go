@@ -113,18 +113,21 @@ func (u *chatUsecase) EnsureSessionExists(ctx context.Context, sessionIDStr stri
 	return u.chatRepo.CreateSession(ctx, newSession)
 }
 
-func (u *chatUsecase) SaveMessage(ctx context.Context, sessionIDStr string, sender string, content string) error {
+func (u *chatUsecase) SaveMessage(ctx context.Context, sessionIDStr string, sender string, content string, sources []byte) error {
 	sessionID, err := uuid.Parse(sessionIDStr)
 	if err != nil {
 		return err
 	}
+	
+	if len(sources) == 0 {
+		sources = []byte("[]")
+	}
 
-	message := &domain.ChatMessage{
+	msg := &domain.ChatMessage{
 		SessionID: sessionID,
 		Sender:    sender,
 		Content:   content,
-		CreatedAt: time.Now(),
+		Sources:   sources,
 	}
-
-	return u.chatRepo.CreateMessage(ctx, message)
+	return u.chatRepo.CreateMessage(ctx, msg)
 }

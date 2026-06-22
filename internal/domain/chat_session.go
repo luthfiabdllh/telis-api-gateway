@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,11 +17,12 @@ type ChatSession struct {
 }
 
 type ChatMessage struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	SessionID uuid.UUID `json:"session_id"`
-	Sender    string    `json:"sender"` // "user" or "ai"
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID       `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	SessionID uuid.UUID       `json:"session_id"`
+	Sender    string          `json:"sender"` // "user" or "ai"
+	Content   string          `json:"content"`
+	Sources   json.RawMessage `gorm:"type:jsonb;default:'[]'" json:"sources"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 func (ChatSession) TableName() string {
@@ -50,5 +52,5 @@ type ChatUsecase interface {
 
 	// Called internally during stream
 	EnsureSessionExists(ctx context.Context, sessionID string, userID uuid.UUID, initialMessage string) error
-	SaveMessage(ctx context.Context, sessionID string, sender string, content string) error
+	SaveMessage(ctx context.Context, sessionID string, sender string, content string, sources []byte) error
 }
