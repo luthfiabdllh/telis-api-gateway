@@ -31,9 +31,9 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 		SELECT d.id, d.folder_id, d.filename, d.file_path, d.status, d.uploaded_by, d.file_size_bytes, d.is_deprecated, d.previous_version_id, d.version, d.created_at, d.updated_at, COALESCE(ft.folder_path, '') as folder_path
 		FROM ingestion.documents d
 		LEFT JOIN folder_tree ft ON d.folder_id = ft.id
-		WHERE 1=1
+		WHERE d.status != 'DELETED'
 	`
-	countQuery := `SELECT count(*) FROM ingestion.documents d WHERE 1=1`
+	countQuery := `SELECT count(*) FROM ingestion.documents d WHERE d.status != 'DELETED'`
 
 	var conditions []string
 	var args []interface{}
