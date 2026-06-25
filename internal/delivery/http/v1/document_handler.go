@@ -238,6 +238,7 @@ func (h *DocumentHandler) GetByID(c *gin.Context) {
 // @Produce application/pdf
 // @Security BearerAuth
 // @Param id path string true "ID Dokumen"
+// @Param view query bool false "Jika true, tampilkan inline (tidak didownload)"
 // @Success 200 {file} file
 // @Failure 401 {object} map[string]interface{} "Unauthorized"
 // @Failure 404 {object} map[string]interface{} "Not Found"
@@ -255,7 +256,12 @@ func (h *DocumentHandler) Download(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(fullPath, filename)
+	if c.Query("view") == "true" {
+		c.Header("Content-Type", "application/pdf")
+		c.File(fullPath)
+	} else {
+		c.FileAttachment(fullPath, filename)
+	}
 }
 
 // Rename godoc
