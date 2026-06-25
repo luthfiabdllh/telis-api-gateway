@@ -189,3 +189,9 @@ func (r *documentRepository) CreatePendingDocument(ctx context.Context, doc *dom
 	)
 	return err
 }
+
+func (r *documentRepository) RestoreDocument(ctx context.Context, id string) error {
+	query := "UPDATE ingestion.documents SET status = 'PENDING', is_deprecated = FALSE WHERE id = $1"
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}

@@ -168,6 +168,59 @@ func (u *documentUsecase) DeprecateDocument(ctx context.Context, documentID stri
 	return nil
 }
 
+func (u *documentUsecase) RestoreDocument(ctx context.Context, documentID string, userID string) error {
+	doc, err := u.repo.GetByID(ctx, documentID)
+	if err != nil {
+		return err
+	}
+	if doc == nil {
+		return errors.New("document not found")
+	}
+
+	fileName := fmt.Sprintf("%s_%s", documentID, doc.Filename)
+	fullPath := filepath.Join(u.baseDir, fileName)
+
+	// Verify physical file exists
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		return errors.New("File fisik tidak ditemukan, Restore gagal")
+	}
+
+	// Update DB Status to PENDING and is_deprecated to FALSE
+	if err := u.repo.RestoreDocument(ctx, documentID); err != nil {
+		return fmt.Errorf("failed to restore document status: %v", err)
+	}
+
+	var folderID string
+	if doc.FolderID != nil {
+		folderID = doc.FolderID.String()
+	}
+
+	var previousVersionID string
+	if doc.PreviousVersionID != nil {
+		previousVersionID = doc.PreviousVersionID.String()
+	}
+
+	// Publish message to RabbitMQ for ingestion worker
+	payload := map[string]interface{}{
+		"action":               "ingest",
+		"document_id":          documentID,
+		"file_path":            fullPath,
+		"filename":             doc.Filename,
+		"user_id":              userID,
+		"file_size_bytes":      doc.FileSizeBytes,
+		"replaces_document_id": previousVersionID,
+		"folder_id":            folderID,
+	}
+
+	err = u.publisher.Publish(ctx, "ingestion_queue", payload)
+	if err != nil {
+		log.Printf("Failed to publish restore to RabbitMQ: %v", err)
+		return err
+	}
+
+	return nil
+}
+
 func (u *documentUsecase) DeleteDocument(ctx context.Context, documentID string, userID string) error {
 	// Publish delete task to RabbitMQ
 	err := u.publisher.PublishDeleteTask(ctx, documentID)

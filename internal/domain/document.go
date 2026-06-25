@@ -38,12 +38,14 @@ type DocumentRepository interface {
 	GetByID(ctx context.Context, id string) (*Document, error)
 	UpdateMetadata(ctx context.Context, id string, filename *string, folderID *string) error
 	CreatePendingDocument(ctx context.Context, doc *Document) error
+	RestoreDocument(ctx context.Context, id string) error
 }
 
 type DocumentUsecase interface {
 	UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, folderID string, replacesDocumentID string) (string, error)
 	DeleteDocument(ctx context.Context, documentID string, userID string) error
 	DeprecateDocument(ctx context.Context, documentID string, userID string) error
+	RestoreDocument(ctx context.Context, documentID string, userID string) error
 	RenameDocument(ctx context.Context, documentID string, newName string) error
 	MoveDocument(ctx context.Context, documentID string, newFolderID *string) error
 	

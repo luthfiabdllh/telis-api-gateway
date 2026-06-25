@@ -27,6 +27,7 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.POST("/upload", handler.Upload)
 		docRoutes.DELETE("/:id", handler.Delete)
 		docRoutes.POST("/:id/deprecate", handler.Deprecate)
+		docRoutes.POST("/:id/restore", handler.Restore)
 		docRoutes.PUT("/:id/rename", handler.Rename)
 		docRoutes.PUT("/:id/move", handler.Move)
 	}
@@ -143,6 +144,44 @@ func (h *DocumentHandler) Deprecate(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"message":     "document deprecation queued",
+		"document_id": documentID,
+	})
+}
+
+// Restore godoc
+// @Summary Pulihkan Dokumen
+// @Description Mengembalikan dokumen yang usang (deprecated) agar diproses kembali oleh AI.
+// @Tags Document
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Success 202 {object} map[string]interface{} "Perintah restore masuk antrean"
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id}/restore [post]
+func (h *DocumentHandler) Restore(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in token"})
+		return
+	}
+
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "document id is required"})
+		return
+	}
+
+	err := h.docUsecase.RestoreDocument(c.Request.Context(), documentID, userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":     "document restore queued",
 		"document_id": documentID,
 	})
 }
