@@ -90,6 +90,49 @@ func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fil
 		return "", err
 	}
 
+	// Create pending document record
+	var folderUUIDPtr *uuid.UUID
+	if folderID != "" && folderID != "null" {
+		id, err := uuid.Parse(folderID)
+		if err == nil {
+			folderUUIDPtr = &id
+		}
+	}
+
+	var replacesUUIDPtr *uuid.UUID
+	if replacesDocumentID != "" && replacesDocumentID != "null" {
+		id, err := uuid.Parse(replacesDocumentID)
+		if err == nil {
+			replacesUUIDPtr = &id
+		}
+	}
+
+	var userUUIDPtr *uuid.UUID
+	if userID != "" {
+		id, err := uuid.Parse(userID)
+		if err == nil {
+			userUUIDPtr = &id
+		}
+	}
+
+	docUUID, _ := uuid.Parse(documentID)
+
+	doc := &domain.Document{
+		ID:                docUUID,
+		Status:            "PENDING",
+		Filename:          fileHeader.Filename,
+		FilePath:          fileName,
+		FolderID:          folderUUIDPtr,
+		PreviousVersionID: replacesUUIDPtr,
+		UploadedBy:        userUUIDPtr,
+		FileSizeBytes:     &fileHeader.Size,
+	}
+
+	if err := u.repo.CreatePendingDocument(ctx, doc); err != nil {
+		os.Remove(fullPath)
+		return "", fmt.Errorf("failed to save document metadata: %v", err)
+	}
+
 	// 3. Publish message to RabbitMQ for ingestion worker
 	payload := map[string]interface{}{
 		"action":               "ingest",
@@ -105,6 +148,7 @@ func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fil
 	err = u.publisher.Publish(ctx, "ingestion_queue", payload)
 	if err != nil {
 		log.Printf("Failed to publish to RabbitMQ: %v", err)
+		os.Remove(fullPath)
 		return "", err
 	}
 

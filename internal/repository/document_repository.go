@@ -165,3 +165,27 @@ func (r *documentRepository) UpdateMetadata(ctx context.Context, id string, file
 	_, err := r.db.ExecContext(ctx, query, args...)
 	return err
 }
+
+func (r *documentRepository) CreatePendingDocument(ctx context.Context, doc *domain.Document) error {
+	version := 1
+	if doc.PreviousVersionID != nil {
+		var prevVersion int
+		err := r.db.QueryRowContext(ctx, "SELECT version FROM ingestion.documents WHERE id = $1", *doc.PreviousVersionID).Scan(&prevVersion)
+		if err == nil {
+			version = prevVersion + 1
+		}
+	}
+	doc.Version = version
+
+	query := `
+		INSERT INTO ingestion.documents (
+			id, status, file_path, filename, previous_version_id, version, folder_id, file_size_bytes, uploaded_by
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
+		)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		doc.ID, doc.Status, doc.FilePath, doc.Filename, doc.PreviousVersionID, doc.Version, doc.FolderID, doc.FileSizeBytes, doc.UploadedBy,
+	)
+	return err
+}

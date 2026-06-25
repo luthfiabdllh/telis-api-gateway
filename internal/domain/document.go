@@ -37,6 +37,7 @@ type DocumentRepository interface {
 	GetAll(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetByID(ctx context.Context, id string) (*Document, error)
 	UpdateMetadata(ctx context.Context, id string, filename *string, folderID *string) error
+	CreatePendingDocument(ctx context.Context, doc *Document) error
 }
 
 type DocumentUsecase interface {
