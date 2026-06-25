@@ -21,7 +21,7 @@ func NewMetricsHandler(r *gin.RouterGroup, metricsUsecase domain.MetricsUsecase)
 	metricsRoutes := r.Group("/metrics")
 	{
 		// Only Admin can see global dashboard
-		metricsRoutes.GET("/tokens", middleware.RoleMiddleware("admin"), handler.GetDashboardMetrics)
+		metricsRoutes.GET("/tokens", middleware.RoleMiddleware("Admin"), handler.GetDashboardMetrics)
 		// Any logged-in user can see their own metrics
 		metricsRoutes.GET("/tokens/me", handler.GetMyMetrics)
 	}
