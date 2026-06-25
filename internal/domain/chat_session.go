@@ -23,6 +23,7 @@ type ChatMessage struct {
 	Content   string          `json:"content"`
 	Sources   json.RawMessage `gorm:"type:jsonb;default:'[]'" json:"sources"`
 	CreatedAt time.Time       `json:"created_at"`
+	Feedback  *UserFeedback   `gorm:"foreignKey:MessageID;references:ID" json:"feedback,omitempty"`
 }
 
 func (ChatSession) TableName() string {

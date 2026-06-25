@@ -9,9 +9,9 @@ import (
 
 type UserFeedback struct {
 	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	MessageID string    `gorm:"type:varchar(255);not null"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null"`
-	Rating    int       `gorm:"type:smallint;not null"` // 1 for Thumbs Up, -1 for Thumbs Down
+	MessageID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"message_id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
+	Rating    int       `gorm:"type:smallint;not null" json:"rating"` // 1 for Thumbs Up, -1 for Thumbs Down
 	Comment   string    `gorm:"type:text"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 }

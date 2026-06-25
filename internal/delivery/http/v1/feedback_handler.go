@@ -26,7 +26,7 @@ func NewFeedbackHandler(rg *gin.RouterGroup, usecase domain.FeedbackUsecase) {
 
 type submitFeedbackRequest struct {
 	MessageID string `json:"message_id" binding:"required"`
-	Rating    int    `json:"rating" binding:"required"`
+	Rating    int    `json:"rating"`
 	Comment   string `json:"comment"`
 }
 
@@ -44,7 +44,7 @@ type submitFeedbackRequest struct {
 // @Router /chat/feedback [post]
 func (h *FeedbackHandler) SubmitFeedback(c *gin.Context) {
 	// Extract userID from context (set by AuthMiddleware)
-	userIDStr, exists := c.Get("userID")
+	userIDStr, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
 		return

@@ -50,6 +50,6 @@ func (r *chatRepository) CreateMessage(ctx context.Context, message *domain.Chat
 
 func (r *chatRepository) GetMessagesBySessionID(ctx context.Context, sessionID uuid.UUID) ([]*domain.ChatMessage, error) {
 	var messages []*domain.ChatMessage
-	err := r.db.WithContext(ctx).Where("session_id = ?", sessionID).Order("created_at asc").Find(&messages).Error
+	err := r.db.WithContext(ctx).Preload("Feedback").Where("session_id = ?", sessionID).Order("created_at asc").Find(&messages).Error
 	return messages, err
 }

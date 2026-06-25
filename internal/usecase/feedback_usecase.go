@@ -20,22 +20,24 @@ func NewFeedbackUsecase(repo domain.FeedbackRepository) domain.FeedbackUsecase {
 
 func (u *feedbackUsecase) SubmitFeedback(ctx context.Context, messageID string, userID uuid.UUID, rating int, comment string) (*domain.UserFeedback, error) {
 	// Validate rating
-	if rating != 1 && rating != -1 {
-		return nil, errors.New("rating must be 1 (Thumbs Up) or -1 (Thumbs Down)")
+	if rating != 1 && rating != -1 && rating != 0 {
+		return nil, errors.New("rating must be 1 (Thumbs Up), -1 (Thumbs Down), or 0 (Cancel)")
 	}
 
-	if messageID == "" {
-		return nil, errors.New("message_id is required")
+	// Parse messageID to UUID
+	msgUUID, err := uuid.Parse(messageID)
+	if err != nil {
+		return nil, errors.New("invalid message id format")
 	}
 
 	feedback := &domain.UserFeedback{
-		MessageID: messageID,
+		MessageID: msgUUID,
 		UserID:    userID,
 		Rating:    rating,
 		Comment:   comment,
 	}
 
-	err := u.repo.Create(ctx, feedback)
+	err = u.repo.Create(ctx, feedback)
 	if err != nil {
 		return nil, err
 	}

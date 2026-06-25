@@ -113,14 +113,12 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 	// Buffer to store AI full response
 	fullAIResponse := ""
 	var sourcesBytes []byte
-	isStreamCompleted := false
+	isSaved := false
 
-	// [NEW] Defer ensures the partial response is ALWAYS saved, even if the user refreshes/disconnects
+	// Defer ensures the partial response is saved if client disconnects prematurely
 	defer func() {
-		if fullAIResponse != "" {
-			if !isStreamCompleted {
-				fullAIResponse += "\n\n*[Teks terputus karena koneksi]*"
-			}
+		if !isSaved && fullAIResponse != "" {
+			fullAIResponse += "\n\n*[Teks terputus karena koneksi]*"
 			_ = h.chatUsecase.SaveMessage(context.Background(), req.SessionID, "ai", fullAIResponse, sourcesBytes)
 		}
 	}()
@@ -141,7 +139,12 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 	c.Stream(func(w io.Writer) bool {
 		resp, err := stream.Recv()
 		if err == io.EOF {
-			isStreamCompleted = true
+			// Save immediately before closing HTTP stream
+			if !isSaved && fullAIResponse != "" {
+				_ = h.chatUsecase.SaveMessage(context.Background(), req.SessionID, "ai", fullAIResponse, sourcesBytes)
+				isSaved = true
+			}
+			writeSSE(w, "done", "[DONE]")
 			return false // End of stream
 		}
 		if err != nil {
@@ -169,8 +172,11 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 
 		// Check if it's final
 		if resp.IsFinal || resp.EventType == "done" {
+			if !isSaved && fullAIResponse != "" {
+				_ = h.chatUsecase.SaveMessage(context.Background(), req.SessionID, "ai", fullAIResponse, sourcesBytes)
+				isSaved = true
+			}
 			writeSSE(w, "done", "[DONE]")
-			isStreamCompleted = true
 			return false
 		}
 
