@@ -33,10 +33,10 @@ func (r *metricsRepository) GetTotalCostThisMonth(ctx context.Context) (float64,
 
 func (r *metricsRepository) GetTopUsersByCost(ctx context.Context, limit int) ([]domain.UserCost, error) {
 	query := `
-		SELECT m.user_id, u.email, u.name, SUM(m.cost_usd) as total_cost
+		SELECT m.user_id, u.email, u.username as name, SUM(m.cost_usd) as total_cost
 		FROM agent.token_metrics m
 		JOIN gateway.users u ON m.user_id = u.id
-		GROUP BY m.user_id, u.email, u.name
+		GROUP BY m.user_id, u.email, u.username
 		ORDER BY total_cost DESC
 		LIMIT $1
 	`
@@ -61,7 +61,7 @@ func (r *metricsRepository) GetDailyUsageTrend(ctx context.Context, days int) ([
 	query := `
 		SELECT DATE(timestamp) as date, SUM(total_tokens) as total_tokens, SUM(cost_usd) as cost_usd
 		FROM agent.token_metrics
-		WHERE timestamp >= CURRENT_DATE - ($1 || ' days')::interval
+		WHERE timestamp >= CURRENT_DATE - interval '1 day' * $1
 		GROUP BY DATE(timestamp)
 		ORDER BY DATE(timestamp) ASC
 	`
