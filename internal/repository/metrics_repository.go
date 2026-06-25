@@ -99,3 +99,61 @@ func (r *metricsRepository) GetMyTotalCostThisMonth(ctx context.Context, userID 
 	}
 	return total, nil
 }
+
+func (r *metricsRepository) GetSystemOverview(ctx context.Context) (*domain.SystemOverview, error) {
+	overview := &domain.SystemOverview{}
+
+	// 1. Total Users
+	if err := r.db.QueryRowContext(ctx, "SELECT count(*) FROM gateway.users").Scan(&overview.TotalUsers); err != nil {
+		return nil, err
+	}
+
+	// 2. Total Documents (excluding DELETED)
+	if err := r.db.QueryRowContext(ctx, "SELECT count(*) FROM ingestion.documents WHERE status != 'DELETED'").Scan(&overview.TotalDocuments); err != nil {
+		return nil, err
+	}
+
+	// 3. Total Folders
+	if err := r.db.QueryRowContext(ctx, "SELECT count(*) FROM ingestion.folders").Scan(&overview.TotalFolders); err != nil {
+		return nil, err
+	}
+
+	// 4. Document Status Distribution
+	docQuery := `SELECT status, count(*) FROM ingestion.documents WHERE status != 'DELETED' GROUP BY status`
+	docRows, err := r.db.QueryContext(ctx, docQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer docRows.Close()
+
+	for docRows.Next() {
+		var dist domain.DocStatusDist
+		if err := docRows.Scan(&dist.Status, &dist.Count); err != nil {
+			return nil, err
+		}
+		overview.DocStatusDist = append(overview.DocStatusDist, dist)
+	}
+
+	// 5. User Role Distribution
+	roleQuery := `
+		SELECT r.name, count(u.id) 
+		FROM gateway.roles r 
+		LEFT JOIN gateway.users u ON r.id = u.role_id 
+		GROUP BY r.name
+	`
+	roleRows, err := r.db.QueryContext(ctx, roleQuery)
+	if err != nil {
+		return nil, err
+	}
+	defer roleRows.Close()
+
+	for roleRows.Next() {
+		var dist domain.UserRoleDist
+		if err := roleRows.Scan(&dist.Role, &dist.Count); err != nil {
+			return nil, err
+		}
+		overview.UserRoleDist = append(overview.UserRoleDist, dist)
+	}
+
+	return overview, nil
+}

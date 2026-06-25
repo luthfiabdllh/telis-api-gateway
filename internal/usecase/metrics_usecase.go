@@ -32,10 +32,20 @@ func (u *metricsUsecase) GetDashboardMetrics(ctx context.Context) (*domain.Dashb
 		return nil, err
 	}
 
+	systemOverview, err := u.repo.GetSystemOverview(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domain.DashboardMetrics{
 		TotalCostThisMonth: totalCost,
 		TopUsers:           topUsers,
 		DailyTrend:         dailyTrend,
+		TotalUsers:         systemOverview.TotalUsers,
+		TotalDocuments:     systemOverview.TotalDocuments,
+		TotalFolders:       systemOverview.TotalFolders,
+		DocStatusDist:      systemOverview.DocStatusDist,
+		UserRoleDist:       systemOverview.UserRoleDist,
 	}, nil
 }
 
