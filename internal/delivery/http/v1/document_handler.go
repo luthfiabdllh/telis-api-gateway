@@ -23,8 +23,10 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.GET("/", handler.List)
 		docRoutes.GET("/:id", handler.GetByID)
 		docRoutes.GET("/:id/download", handler.Download)
-		
+		docRoutes.GET("/:id/summarize", handler.Summarize) // Phase 1
+
 		docRoutes.POST("/upload", handler.Upload)
+		docRoutes.PATCH("/:id/metadata", handler.UpdateMetadata) // Phase 1
 		docRoutes.DELETE("/:id", handler.Delete)
 		docRoutes.POST("/:id/deprecate", handler.Deprecate)
 		docRoutes.POST("/:id/restore", handler.Restore)
@@ -376,3 +378,66 @@ func (h *DocumentHandler) Move(c *gin.Context) {
 	})
 }
 
+// Summarize godoc
+// @Summary Buat Ringkasan Dokumen
+// @Description Menghasilkan ringkasan terstruktur dari dokumen legal.
+//
+//				Menggunakan hybrid cache-first: jika ringkasan sudah ada di DB, langsung return;
+//				jika belum, generate via LLM (~5-10 detik) lalu simpan ke DB.
+//
+// @Tags Document
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Success 200 {object} map[string]interface{} "Ringkasan dokumen"
+// @Failure 404 {object} map[string]interface{} "Dokumen tidak ditemukan"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id}/summarize [get]
+func (h *DocumentHandler) Summarize(c *gin.Context) {
+	documentID := c.Param("id")
+
+	result, err := h.docUsecase.SummarizeDocument(c.Request.Context(), documentID)
+	if err != nil {
+		if err.Error() == "document not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "dokumen tidak ditemukan"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// UpdateMetadata godoc
+// @Summary Update Metadata Dokumen (Phase 1)
+// @Description Memperbarui metadata rich dari dokumen: kategori, risk level, vendor, divisi, tanggal.
+//
+//				Hanya dapat diakses oleh Admin dan Legal.
+//
+// @Tags Document
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Param metadata body domain.DocumentRichMetadata true "Metadata yang ingin diperbarui"
+// @Success 200 {object} map[string]interface{} "Berhasil diperbarui"
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id}/metadata [patch]
+func (h *DocumentHandler) UpdateMetadata(c *gin.Context) {
+	documentID := c.Param("id")
+
+	var meta domain.DocumentRichMetadata
+	if err := c.ShouldBindJSON(&meta); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.docUsecase.UpdateRichMetadata(c.Request.Context(), documentID, meta); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "metadata berhasil diperbarui"})
+}

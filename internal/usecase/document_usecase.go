@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,19 +14,22 @@ import (
 	"github.com/google/uuid"
 	"telis-api-gateway/internal/domain"
 	"telis-api-gateway/internal/infrastructure/rabbitmq"
+	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
 )
 
 type documentUsecase struct {
-	publisher rabbitmq.Publisher
-	repo      domain.DocumentRepository
-	baseDir   string // e.g. ../shared_docs
+	publisher   rabbitmq.Publisher
+	repo        domain.DocumentRepository
+	baseDir     string // e.g. ../shared_docs
+	agentClient grpcClient.AgentClient
 }
 
-func NewDocumentUsecase(publisher rabbitmq.Publisher, repo domain.DocumentRepository, baseDir string) domain.DocumentUsecase {
+func NewDocumentUsecase(publisher rabbitmq.Publisher, repo domain.DocumentRepository, baseDir string, agentClient grpcClient.AgentClient) domain.DocumentUsecase {
 	return &documentUsecase{
-		publisher: publisher,
-		repo:      repo,
-		baseDir:   baseDir,
+		publisher:   publisher,
+		repo:        repo,
+		baseDir:     baseDir,
+		agentClient: agentClient,
 	}
 }
 
@@ -267,4 +271,68 @@ func (u *documentUsecase) RenameDocument(ctx context.Context, documentID string,
 
 func (u *documentUsecase) MoveDocument(ctx context.Context, documentID string, newFolderID *string) error {
 	return u.repo.UpdateMetadata(ctx, documentID, nil, newFolderID)
+}
+
+// UpdateRichMetadata updates Phase 1 metadata fields for a document.
+// Accessible by Admin and Legal roles via PATCH /documents/:id/metadata.
+func (u *documentUsecase) UpdateRichMetadata(ctx context.Context, documentID string, meta domain.DocumentRichMetadata) error {
+	_, err := u.repo.GetByID(ctx, documentID)
+	if err != nil {
+		return err
+	}
+	return u.repo.UpdateRichMetadata(ctx, documentID, meta)
+}
+
+// SummarizeDocument returns a structured summary of a document.
+// Uses hybrid cache-first pattern:
+//   - If summary already exists in DB, return it immediately.
+//   - If not, call Agent Service gRPC to generate summary, persist to DB, then return.
+func (u *documentUsecase) SummarizeDocument(ctx context.Context, documentID string) (*domain.DocumentSummaryResult, error) {
+	doc, err := u.repo.GetByID(ctx, documentID)
+	if err != nil {
+		return nil, err
+	}
+	if doc == nil {
+		return nil, errors.New("document not found")
+	}
+
+	// Cache-first: return from DB if summary already generated
+	if doc.Summary != "" {
+		var summaryMap map[string]interface{}
+		if err := json.Unmarshal([]byte(doc.Summary), &summaryMap); err != nil {
+			// Summary stored as plain text, wrap it
+			summaryMap = map[string]interface{}{"ringkasan_singkat": doc.Summary}
+		}
+		return &domain.DocumentSummaryResult{
+			DocumentID:   documentID,
+			Filename:     doc.Filename,
+			DocumentType: doc.DocumentType,
+			Summary:      summaryMap,
+			Cached:       true,
+		}, nil
+	}
+
+	// Not cached — call Agent Service via gRPC
+	summaryJSON, err := u.agentClient.SummarizeDocument(ctx, documentID, doc.DocumentType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate summary: %v", err)
+	}
+
+	// Persist to DB for future cache hits
+	if saveErr := u.repo.SaveDocumentSummary(ctx, documentID, summaryJSON); saveErr != nil {
+		log.Printf("Warning: failed to cache summary for document %s: %v", documentID, saveErr)
+	}
+
+	var summaryMap map[string]interface{}
+	if err := json.Unmarshal([]byte(summaryJSON), &summaryMap); err != nil {
+		summaryMap = map[string]interface{}{"ringkasan_singkat": summaryJSON}
+	}
+
+	return &domain.DocumentSummaryResult{
+		DocumentID:   documentID,
+		Filename:     doc.Filename,
+		DocumentType: doc.DocumentType,
+		Summary:      summaryMap,
+		Cached:       false,
+	}, nil
 }

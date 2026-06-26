@@ -22,6 +22,15 @@ type Document struct {
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 	FolderPath        string     `json:"folder_path,omitempty"`
+
+	// Phase 1 — Rich Metadata (v2.0)
+	DocumentType  string     `json:"document_type,omitempty"`  // Kategori klasifikasi otomatis
+	RiskLevel     string     `json:"risk_level,omitempty"`     // LOW / MEDIUM / HIGH / UNKNOWN
+	VendorName    string     `json:"vendor_name,omitempty"`    // Nama pihak/vendor
+	BusinessUnit  string     `json:"business_unit,omitempty"` // Divisi terkait
+	EffectiveDate *time.Time `json:"effective_date,omitempty"` // Tanggal mulai berlaku
+	ExpiryDate    *time.Time `json:"expiry_date,omitempty"`    // Tanggal berakhir
+	Summary       string     `json:"summary,omitempty"`        // Ringkasan dalam Bahasa Indonesia
 }
 
 type DocumentFilter struct {
@@ -31,14 +40,29 @@ type DocumentFilter struct {
 	Status       string
 	IsDeprecated *bool
 	FolderID     *string
+	// Phase 1 filters
+	DocumentType string // e.g. "NDA", "REGULATORY_DOCUMENT"
+	RiskLevel    string // e.g. "HIGH", "MEDIUM"
 }
 
 type DocumentRepository interface {
 	GetAll(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetByID(ctx context.Context, id string) (*Document, error)
 	UpdateMetadata(ctx context.Context, id string, filename *string, folderID *string) error
+	UpdateRichMetadata(ctx context.Context, id string, meta DocumentRichMetadata) error // Phase 1
 	CreatePendingDocument(ctx context.Context, doc *Document) error
 	RestoreDocument(ctx context.Context, id string) error
+	SaveDocumentSummary(ctx context.Context, id string, summary string) error // Phase 1
+}
+
+// DocumentRichMetadata holds updatable metadata fields from Phase 1
+type DocumentRichMetadata struct {
+	DocumentType  *string    `json:"document_type"`
+	RiskLevel     *string    `json:"risk_level"`
+	VendorName    *string    `json:"vendor_name"`
+	BusinessUnit  *string    `json:"business_unit"`
+	EffectiveDate *time.Time `json:"effective_date"`
+	ExpiryDate    *time.Time `json:"expiry_date"`
 }
 
 type DocumentUsecase interface {
@@ -48,8 +72,19 @@ type DocumentUsecase interface {
 	RestoreDocument(ctx context.Context, documentID string, userID string) error
 	RenameDocument(ctx context.Context, documentID string, newName string) error
 	MoveDocument(ctx context.Context, documentID string, newFolderID *string) error
-	
+	UpdateRichMetadata(ctx context.Context, documentID string, meta DocumentRichMetadata) error // Phase 1
+
 	GetAllDocuments(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetDocumentByID(ctx context.Context, documentID string) (*Document, error)
 	GetDocumentFilePath(ctx context.Context, documentID string) (string, string, error) // Returns filePath, filename, error
+	SummarizeDocument(ctx context.Context, documentID string) (*DocumentSummaryResult, error) // Phase 1
+}
+
+// DocumentSummaryResult is the structured output of the summarization endpoint
+type DocumentSummaryResult struct {
+	DocumentID   string                 `json:"document_id"`
+	Filename     string                 `json:"filename"`
+	DocumentType string                 `json:"document_type"`
+	Summary      map[string]interface{} `json:"summary"`
+	Cached       bool                   `json:"cached"` // true if returned from DB cache
 }

@@ -92,7 +92,7 @@ func main() {
 	
 	// Base dir for shared documents
 	sharedDocsDir := "../shared_docs" // Assuming running from root of telis-api-gateway
-	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, documentRepo, sharedDocsDir)
+	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, documentRepo, sharedDocsDir, agentClient)
 	folderUsecase := usecase.NewFolderUsecase(folderRepo, docUsecase)
 	redlineUsecase := usecase.NewRedlineUsecase(redlineRepo, rmqPublisher, sharedDocsDir)
 	chatUsecase := usecase.NewChatUsecase(chatRepo)

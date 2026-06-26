@@ -28,7 +28,15 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 			FROM ingestion.folders f
 			INNER JOIN folder_tree ft ON f.parent_id = ft.id
 		)
-		SELECT d.id, d.folder_id, d.filename, d.file_path, d.status, d.uploaded_by, d.file_size_bytes, d.is_deprecated, d.previous_version_id, d.version, d.created_at, d.updated_at, COALESCE(ft.folder_path, '') as folder_path
+		SELECT d.id, d.folder_id, d.filename, d.file_path, d.status, d.uploaded_by,
+		       d.file_size_bytes, d.is_deprecated, d.previous_version_id, d.version,
+		       d.created_at, d.updated_at, COALESCE(ft.folder_path, '') as folder_path,
+		       COALESCE(d.document_type, 'OTHER') as document_type,
+		       COALESCE(d.risk_level, 'UNKNOWN') as risk_level,
+		       COALESCE(d.vendor_name, '') as vendor_name,
+		       COALESCE(d.business_unit, '') as business_unit,
+		       d.effective_date, d.expiry_date,
+		       COALESCE(d.summary, '') as summary
 		FROM ingestion.documents d
 		LEFT JOIN folder_tree ft ON d.folder_id = ft.id
 		WHERE d.status != 'DELETED'
@@ -65,6 +73,19 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 			args = append(args, *filter.FolderID)
 			argId++
 		}
+	}
+
+	// Phase 1 filters
+	if filter.DocumentType != "" {
+		conditions = append(conditions, fmt.Sprintf("d.document_type = $%d", argId))
+		args = append(args, filter.DocumentType)
+		argId++
+	}
+
+	if filter.RiskLevel != "" {
+		conditions = append(conditions, fmt.Sprintf("d.risk_level = $%d", argId))
+		args = append(args, filter.RiskLevel)
+		argId++
 	}
 
 	if len(conditions) > 0 {
@@ -108,6 +129,8 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 			&doc.ID, &doc.FolderID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
 			&doc.FileSizeBytes, &doc.IsDeprecated, &doc.PreviousVersionID,
 			&doc.Version, &doc.CreatedAt, &doc.UpdatedAt, &doc.FolderPath,
+			&doc.DocumentType, &doc.RiskLevel, &doc.VendorName, &doc.BusinessUnit,
+			&doc.EffectiveDate, &doc.ExpiryDate, &doc.Summary,
 		)
 		if err != nil {
 			return nil, 0, err
@@ -119,13 +142,24 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 }
 
 func (r *documentRepository) GetByID(ctx context.Context, id string) (*domain.Document, error) {
-	query := `SELECT id, folder_id, filename, file_path, status, uploaded_by, file_size_bytes, is_deprecated, previous_version_id, version, created_at, updated_at FROM ingestion.documents WHERE id = $1`
+	query := `
+		SELECT id, folder_id, filename, file_path, status, uploaded_by, file_size_bytes,
+		       is_deprecated, previous_version_id, version, created_at, updated_at,
+		       COALESCE(document_type, 'OTHER') as document_type,
+		       COALESCE(risk_level, 'UNKNOWN') as risk_level,
+		       COALESCE(vendor_name, '') as vendor_name,
+		       COALESCE(business_unit, '') as business_unit,
+		       effective_date, expiry_date,
+		       COALESCE(summary, '') as summary
+		FROM ingestion.documents WHERE id = $1`
 
 	var doc domain.Document
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&doc.ID, &doc.FolderID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
 		&doc.FileSizeBytes, &doc.IsDeprecated, &doc.PreviousVersionID,
 		&doc.Version, &doc.CreatedAt, &doc.UpdatedAt,
+		&doc.DocumentType, &doc.RiskLevel, &doc.VendorName, &doc.BusinessUnit,
+		&doc.EffectiveDate, &doc.ExpiryDate, &doc.Summary,
 	)
 
 	if err == sql.ErrNoRows {
@@ -193,5 +227,61 @@ func (r *documentRepository) CreatePendingDocument(ctx context.Context, doc *dom
 func (r *documentRepository) RestoreDocument(ctx context.Context, id string) error {
 	query := "UPDATE ingestion.documents SET status = 'PENDING', is_deprecated = FALSE WHERE id = $1"
 	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+// UpdateRichMetadata updates Phase 1 metadata fields — only non-nil fields are updated.
+func (r *documentRepository) UpdateRichMetadata(ctx context.Context, id string, meta domain.DocumentRichMetadata) error {
+	query := "UPDATE ingestion.documents SET updated_at = CURRENT_TIMESTAMP"
+	var args []interface{}
+	argCount := 1
+
+	if meta.DocumentType != nil {
+		query += fmt.Sprintf(", document_type = $%d", argCount)
+		args = append(args, *meta.DocumentType)
+		argCount++
+	}
+	if meta.RiskLevel != nil {
+		query += fmt.Sprintf(", risk_level = $%d", argCount)
+		args = append(args, *meta.RiskLevel)
+		argCount++
+	}
+	if meta.VendorName != nil {
+		query += fmt.Sprintf(", vendor_name = $%d", argCount)
+		args = append(args, *meta.VendorName)
+		argCount++
+	}
+	if meta.BusinessUnit != nil {
+		query += fmt.Sprintf(", business_unit = $%d", argCount)
+		args = append(args, *meta.BusinessUnit)
+		argCount++
+	}
+	if meta.EffectiveDate != nil {
+		query += fmt.Sprintf(", effective_date = $%d", argCount)
+		args = append(args, *meta.EffectiveDate)
+		argCount++
+	}
+	if meta.ExpiryDate != nil {
+		query += fmt.Sprintf(", expiry_date = $%d", argCount)
+		args = append(args, *meta.ExpiryDate)
+		argCount++
+	}
+
+	if argCount == 1 {
+		return nil // Nothing to update
+	}
+
+	query += fmt.Sprintf(" WHERE id = $%d", argCount)
+	args = append(args, id)
+	_, err := r.db.ExecContext(ctx, query, args...)
+	return err
+}
+
+// SaveDocumentSummary persists the generated summary to the DB for caching.
+func (r *documentRepository) SaveDocumentSummary(ctx context.Context, id string, summary string) error {
+	_, err := r.db.ExecContext(ctx,
+		"UPDATE ingestion.documents SET summary = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+		summary, id,
+	)
 	return err
 }
