@@ -389,14 +389,16 @@ func (h *DocumentHandler) Move(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "ID Dokumen"
+// @Param force query bool false "Force regenerate summary (bypass cache)"
 // @Success 200 {object} map[string]interface{} "Ringkasan dokumen"
 // @Failure 404 {object} map[string]interface{} "Dokumen tidak ditemukan"
 // @Failure 500 {object} map[string]interface{} "Internal Server Error"
 // @Router /documents/{id}/summarize [get]
 func (h *DocumentHandler) Summarize(c *gin.Context) {
 	documentID := c.Param("id")
+	force := c.Query("force") == "true"
 
-	result, err := h.docUsecase.SummarizeDocument(c.Request.Context(), documentID)
+	result, err := h.docUsecase.SummarizeDocument(c.Request.Context(), documentID, force)
 	if err != nil {
 		if err.Error() == "document not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "dokumen tidak ditemukan"})

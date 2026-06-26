@@ -287,7 +287,7 @@ func (u *documentUsecase) UpdateRichMetadata(ctx context.Context, documentID str
 // Uses hybrid cache-first pattern:
 //   - If summary already exists in DB, return it immediately.
 //   - If not, call Agent Service gRPC to generate summary, persist to DB, then return.
-func (u *documentUsecase) SummarizeDocument(ctx context.Context, documentID string) (*domain.DocumentSummaryResult, error) {
+func (u *documentUsecase) SummarizeDocument(ctx context.Context, documentID string, force bool) (*domain.DocumentSummaryResult, error) {
 	doc, err := u.repo.GetByID(ctx, documentID)
 	if err != nil {
 		return nil, err
@@ -296,8 +296,8 @@ func (u *documentUsecase) SummarizeDocument(ctx context.Context, documentID stri
 		return nil, errors.New("document not found")
 	}
 
-	// Cache-first: return from DB if summary already generated
-	if doc.Summary != "" {
+	// Cache-first: return from DB if summary already generated and force is false
+	if !force && doc.Summary != "" {
 		var summaryMap map[string]interface{}
 		if err := json.Unmarshal([]byte(doc.Summary), &summaryMap); err != nil {
 			// Summary stored as plain text, wrap it

@@ -77,7 +77,7 @@ type DocumentUsecase interface {
 	GetAllDocuments(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetDocumentByID(ctx context.Context, documentID string) (*Document, error)
 	GetDocumentFilePath(ctx context.Context, documentID string) (string, string, error) // Returns filePath, filename, error
-	SummarizeDocument(ctx context.Context, documentID string) (*DocumentSummaryResult, error) // Phase 1
+	SummarizeDocument(ctx context.Context, documentID string, force bool) (*DocumentSummaryResult, error) // Phase 1
 }
 
 // DocumentSummaryResult is the structured output of the summarization endpoint
