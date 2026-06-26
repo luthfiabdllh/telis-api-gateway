@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package legal_engine;
+option go_package = "telis-api-gateway/pb;pb";
+
+message Clause {
+    string id = 1;
+    string document_id = 2;
+    string clause_type = 3;
+    string clause_text = 4;
+    string risk_level = 5;
+    string risk_reasoning = 6;
+    string created_at = 7;
+}
+
+message AnalyzeDocumentRequest {
+    string document_id = 1;
+    string text = 2;
+}
+
+message AnalyzeDocumentResponse {
+    string document_id = 1;
+    string document_risk_level = 2;
+    string document_risk_reasoning = 3;
+    repeated Clause clauses = 4;
+}
+
+message GetClausesRequest {
+    string document_id = 1;
+}
+
+message GetClausesResponse {
+    repeated Clause clauses = 1;
+}
+
+service LegalEngineService {
+    rpc AnalyzeDocument(AnalyzeDocumentRequest) returns (AnalyzeDocumentResponse);
+    rpc GetDocumentClauses(GetClausesRequest) returns (GetClausesResponse);
+}

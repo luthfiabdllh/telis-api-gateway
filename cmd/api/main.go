@@ -69,6 +69,12 @@ func main() {
 	defer agentClient.Close()
 	log.Println("Successfully initialized gRPC Agent Client")
 
+	legalEngineClient, err := grpcClient.NewLegalEngineClient(cfg.LegalEngineURL)
+	if err != nil {
+		log.Fatalf("Failed to create Legal Engine gRPC Client: %v", err)
+	}
+	log.Println("Successfully initialized gRPC Legal Engine Client")
+
 	// 4. Dependency Injection (Wiring)
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -92,7 +98,7 @@ func main() {
 	
 	// Base dir for shared documents
 	sharedDocsDir := "../shared_docs" // Assuming running from root of telis-api-gateway
-	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, documentRepo, sharedDocsDir, agentClient)
+	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, documentRepo, sharedDocsDir, agentClient, legalEngineClient)
 	folderUsecase := usecase.NewFolderUsecase(folderRepo, docUsecase)
 	redlineUsecase := usecase.NewRedlineUsecase(redlineRepo, rmqPublisher, sharedDocsDir)
 	chatUsecase := usecase.NewChatUsecase(chatRepo)

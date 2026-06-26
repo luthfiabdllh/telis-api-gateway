@@ -18,18 +18,20 @@ import (
 )
 
 type documentUsecase struct {
-	publisher   rabbitmq.Publisher
-	repo        domain.DocumentRepository
-	baseDir     string // e.g. ../shared_docs
-	agentClient grpcClient.AgentClient
+	publisher         rabbitmq.Publisher
+	repo              domain.DocumentRepository
+	baseDir           string // e.g. ../shared_docs
+	agentClient       grpcClient.AgentClient
+	legalEngineClient domain.LegalEngineClient
 }
 
-func NewDocumentUsecase(publisher rabbitmq.Publisher, repo domain.DocumentRepository, baseDir string, agentClient grpcClient.AgentClient) domain.DocumentUsecase {
+func NewDocumentUsecase(publisher rabbitmq.Publisher, repo domain.DocumentRepository, baseDir string, agentClient grpcClient.AgentClient, legalEngineClient domain.LegalEngineClient) domain.DocumentUsecase {
 	return &documentUsecase{
-		publisher:   publisher,
-		repo:        repo,
-		baseDir:     baseDir,
-		agentClient: agentClient,
+		publisher:         publisher,
+		repo:              repo,
+		baseDir:           baseDir,
+		agentClient:       agentClient,
+		legalEngineClient: legalEngineClient,
 	}
 }
 
@@ -339,4 +341,24 @@ func (u *documentUsecase) SummarizeDocument(ctx context.Context, documentID stri
 		Summary:      summaryMap,
 		Cached:       false,
 	}, nil
+}
+
+func (u *documentUsecase) GetDocumentClauses(ctx context.Context, documentID string) ([]domain.DocumentClause, error) {
+	// Check if document exists first
+	_, err := u.repo.GetByID(ctx, documentID)
+	if err != nil {
+		return nil, err
+	}
+	return u.legalEngineClient.GetDocumentClauses(ctx, documentID)
+}
+
+func (u *documentUsecase) ProcessWebhook(ctx context.Context, title string, url string, publishedDate string) error {
+	payload := map[string]interface{}{
+		"action":         "crawl_regulation",
+		"title":          title,
+		"url":            url,
+		"published_date": publishedDate,
+	}
+
+	return u.publisher.Publish(ctx, "ingestion_queue", payload)
 }

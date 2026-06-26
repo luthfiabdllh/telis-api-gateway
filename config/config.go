@@ -25,6 +25,7 @@ type Config struct {
 	InternalSSOSecret   string
 	RabbitMQURL         string
 	AgentServiceURL     string
+	LegalEngineURL      string
 }
 
 func LoadConfig() *Config {
@@ -49,6 +50,7 @@ func LoadConfig() *Config {
 		InternalSSOSecret:   getEnv("INTERNAL_SSO_SECRET", "secret"),
 		RabbitMQURL:         getEnv("RABBITMQ_URL", "amqp://telis_rmq:telis_secret_rmq@localhost:5672/"),
 		AgentServiceURL:     getEnv("AGENT_SERVICE_URL", "localhost:8001"),
+		LegalEngineURL:      getEnv("LEGAL_ENGINE_GRPC_URL", "localhost:50054"),
 	}
 }
 

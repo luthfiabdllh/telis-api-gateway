@@ -369,3 +369,4 @@ func (r *documentRepository) SaveDocumentSummary(ctx context.Context, id string,
 	)
 	return err
 }
+

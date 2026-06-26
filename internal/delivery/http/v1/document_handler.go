@@ -25,6 +25,7 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.GET("/:id", handler.GetByID)
 		docRoutes.GET("/:id/download", handler.Download)
 		docRoutes.GET("/:id/summarize", handler.Summarize) // Phase 1
+		docRoutes.GET("/:id/clauses", handler.GetClauses) // Phase 2
 
 		docRoutes.POST("/upload", handler.Upload)
 		docRoutes.PATCH("/:id/metadata", handler.UpdateMetadata) // Phase 1
@@ -33,6 +34,11 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.POST("/:id/restore", handler.Restore)
 		docRoutes.PUT("/:id/rename", handler.Rename)
 		docRoutes.PUT("/:id/move", handler.Move)
+	}
+
+	webhookRoutes := r.Group("/webhook")
+	{
+		webhookRoutes.POST("/regulations", handler.HandleWebhook)
 	}
 }
 
@@ -464,4 +470,68 @@ func (h *DocumentHandler) GetMetadataOptions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, opts)
+}
+
+type WebhookRegulationRequest struct {
+	Title         string `json:"title"`
+	Url           string `json:"url"`
+	PublishedDate string `json:"published_date"`
+}
+
+// HandleWebhook godoc
+// @Summary Handle Webhook Regulation
+// @Description Endpoint for receiving regulations updates from JDIH/BSSN
+// @Tags Webhook
+// @Accept json
+// @Produce json
+// @Param payload body WebhookRegulationRequest true "Webhook Payload"
+// @Success 202 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /webhook/regulations [post]
+func (h *DocumentHandler) HandleWebhook(c *gin.Context) {
+	var req WebhookRegulationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.docUsecase.ProcessWebhook(c.Request.Context(), req.Title, req.Url, req.PublishedDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message": "webhook accepted and queued for processing",
+	})
+}
+
+// GetClauses godoc
+// @Summary Ambil Klausul Dokumen
+// @Description Mengambil daftar klausul dan skor risiko dari dokumen (Phase 2).
+// @Tags Document
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID Dokumen"
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /documents/{id}/clauses [get]
+func (h *DocumentHandler) GetClauses(c *gin.Context) {
+	documentID := c.Param("id")
+	if documentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "document id is required"})
+		return
+	}
+
+	clauses, err := h.docUsecase.GetDocumentClauses(c.Request.Context(), documentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": clauses,
+	})
 }

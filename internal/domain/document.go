@@ -56,6 +56,17 @@ type MetadataOptions struct {
 	BusinessUnits []string `json:"business_units"`
 }
 
+// Phase 2
+type DocumentClause struct {
+	ID            uuid.UUID `json:"id"`
+	DocumentID    uuid.UUID `json:"document_id"`
+	ClauseType    string    `json:"clause_type"`
+	ClauseText    string    `json:"clause_text"`
+	RiskLevel     string    `json:"risk_level"`
+	RiskReasoning string    `json:"risk_reasoning"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 type DocumentRepository interface {
 	GetAll(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetByID(ctx context.Context, id string) (*Document, error)
@@ -65,6 +76,10 @@ type DocumentRepository interface {
 	CreatePendingDocument(ctx context.Context, doc *Document) error
 	RestoreDocument(ctx context.Context, id string) error
 	SaveDocumentSummary(ctx context.Context, id string, summary string) error // Phase 1
+}
+
+type LegalEngineClient interface {
+	GetDocumentClauses(ctx context.Context, documentID string) ([]DocumentClause, error) // Phase 2
 }
 
 // DocumentRichMetadata holds updatable metadata fields from Phase 1
@@ -84,6 +99,7 @@ type DocumentUsecase interface {
 	RestoreDocument(ctx context.Context, documentID string, userID string) error
 	RenameDocument(ctx context.Context, documentID string, newName string) error
 	MoveDocument(ctx context.Context, documentID string, newFolderID *string) error
+	ProcessWebhook(ctx context.Context, title string, url string, publishedDate string) error
 	UpdateRichMetadata(ctx context.Context, documentID string, meta DocumentRichMetadata) error // Phase 1
 
 	GetAllDocuments(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
@@ -91,6 +107,7 @@ type DocumentUsecase interface {
 	GetMetadataOptions(ctx context.Context) (*MetadataOptions, error)
 	GetDocumentFilePath(ctx context.Context, documentID string) (string, string, error) // Returns filePath, filename, error
 	SummarizeDocument(ctx context.Context, documentID string, force bool) (*DocumentSummaryResult, error) // Phase 1
+	GetDocumentClauses(ctx context.Context, documentID string) ([]DocumentClause, error) // Phase 2
 }
 
 // DocumentSummaryResult is the structured output of the summarization endpoint
