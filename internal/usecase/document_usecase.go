@@ -65,6 +65,10 @@ func (u *documentUsecase) GetDocumentFilePath(ctx context.Context, documentID st
 	return fullPath, doc.Filename, nil
 }
 
+func (u *documentUsecase) GetMetadataOptions(ctx context.Context) (*domain.MetadataOptions, error) {
+	return u.repo.GetMetadataOptions(ctx)
+}
+
 func (u *documentUsecase) UploadDocument(ctx context.Context, userID string, fileHeader *multipart.FileHeader, folderID string, replacesDocumentID string) (string, error) {
 	// 1. Generate unique Document ID
 	documentID := uuid.New().String()

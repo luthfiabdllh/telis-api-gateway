@@ -43,11 +43,23 @@ type DocumentFilter struct {
 	// Phase 1 filters
 	DocumentType string // e.g. "NDA", "REGULATORY_DOCUMENT"
 	RiskLevel    string // e.g. "HIGH", "MEDIUM"
+	VendorName   string
+	BusinessUnit string
+
+	// Sorting
+	SortBy    string // e.g. "filename", "created_at"
+	SortOrder string // e.g. "asc", "desc"
+}
+
+type MetadataOptions struct {
+	Vendors       []string `json:"vendors"`
+	BusinessUnits []string `json:"business_units"`
 }
 
 type DocumentRepository interface {
 	GetAll(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetByID(ctx context.Context, id string) (*Document, error)
+	GetMetadataOptions(ctx context.Context) (*MetadataOptions, error)
 	UpdateMetadata(ctx context.Context, id string, filename *string, folderID *string) error
 	UpdateRichMetadata(ctx context.Context, id string, meta DocumentRichMetadata) error // Phase 1
 	CreatePendingDocument(ctx context.Context, doc *Document) error
@@ -76,6 +88,7 @@ type DocumentUsecase interface {
 
 	GetAllDocuments(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetDocumentByID(ctx context.Context, documentID string) (*Document, error)
+	GetMetadataOptions(ctx context.Context) (*MetadataOptions, error)
 	GetDocumentFilePath(ctx context.Context, documentID string) (string, string, error) // Returns filePath, filename, error
 	SummarizeDocument(ctx context.Context, documentID string, force bool) (*DocumentSummaryResult, error) // Phase 1
 }

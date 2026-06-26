@@ -5,12 +5,17 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"telis-api-gateway/internal/domain"
 )
 
 type documentRepository struct {
-	db *sql.DB
+	db               *sql.DB
+	mu               sync.Mutex
+	cachedOptions    *domain.MetadataOptions
+	optionsCacheTime time.Time
 }
 
 func NewDocumentRepository(db *sql.DB) domain.DocumentRepository {
@@ -88,6 +93,18 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 		argId++
 	}
 
+	if filter.VendorName != "" {
+		conditions = append(conditions, fmt.Sprintf("d.vendor_name = $%d", argId))
+		args = append(args, filter.VendorName)
+		argId++
+	}
+
+	if filter.BusinessUnit != "" {
+		conditions = append(conditions, fmt.Sprintf("d.business_unit = $%d", argId))
+		args = append(args, filter.BusinessUnit)
+		argId++
+	}
+
 	if len(conditions) > 0 {
 		condStr := " AND " + strings.Join(conditions, " AND ")
 		query += condStr
@@ -102,7 +119,24 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 	}
 
 	// Add Order and Pagination
-	query += " ORDER BY d.created_at DESC"
+	validSortColumns := map[string]string{
+		"filename":        "d.filename",
+		"created_at":      "d.created_at",
+		"file_size_bytes": "d.file_size_bytes",
+		"risk_level":      "d.risk_level",
+	}
+
+	sortColumn := "d.filename" // Default
+	if col, ok := validSortColumns[filter.SortBy]; ok {
+		sortColumn = col
+	}
+
+	sortOrder := "ASC" // Default
+	if strings.ToUpper(filter.SortOrder) == "DESC" {
+		sortOrder = "DESC"
+	}
+
+	query += fmt.Sprintf(" ORDER BY %s %s", sortColumn, sortOrder)
 
 	if filter.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", argId)
@@ -228,6 +262,56 @@ func (r *documentRepository) RestoreDocument(ctx context.Context, id string) err
 	query := "UPDATE ingestion.documents SET status = 'PENDING', is_deprecated = FALSE WHERE id = $1"
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
+}
+
+
+func (r *documentRepository) GetMetadataOptions(ctx context.Context) (*domain.MetadataOptions, error) {
+	r.mu.Lock()
+	if r.cachedOptions != nil && time.Since(r.optionsCacheTime) < 5*time.Minute {
+		defer r.mu.Unlock()
+		return r.cachedOptions, nil
+	}
+	r.mu.Unlock()
+
+	// Need to query DB
+	var vendors []string
+	var busUnits []string
+
+	vRows, err := r.db.QueryContext(ctx, "SELECT DISTINCT vendor_name FROM ingestion.documents WHERE vendor_name IS NOT NULL AND vendor_name != ''")
+	if err != nil {
+		return nil, err
+	}
+	defer vRows.Close()
+	for vRows.Next() {
+		var v string
+		if err := vRows.Scan(&v); err == nil {
+			vendors = append(vendors, v)
+		}
+	}
+
+	bRows, err := r.db.QueryContext(ctx, "SELECT DISTINCT business_unit FROM ingestion.documents WHERE business_unit IS NOT NULL AND business_unit != ''")
+	if err != nil {
+		return nil, err
+	}
+	defer bRows.Close()
+	for bRows.Next() {
+		var b string
+		if err := bRows.Scan(&b); err == nil {
+			busUnits = append(busUnits, b)
+		}
+	}
+
+	opts := &domain.MetadataOptions{
+		Vendors:       vendors,
+		BusinessUnits: busUnits,
+	}
+
+	r.mu.Lock()
+	r.cachedOptions = opts
+	r.optionsCacheTime = time.Now()
+	r.mu.Unlock()
+
+	return opts, nil
 }
 
 // UpdateRichMetadata updates Phase 1 metadata fields — only non-nil fields are updated.

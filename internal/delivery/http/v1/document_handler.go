@@ -21,6 +21,7 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 	{
 		docRoutes.GET("", handler.List)
 		docRoutes.GET("/", handler.List)
+		docRoutes.GET("/metadata-options", handler.GetMetadataOptions)
 		docRoutes.GET("/:id", handler.GetByID)
 		docRoutes.GET("/:id/download", handler.Download)
 		docRoutes.GET("/:id/summarize", handler.Summarize) // Phase 1
@@ -215,10 +216,16 @@ func (h *DocumentHandler) List(c *gin.Context) {
 	}
 
 	filter := domain.DocumentFilter{
-		Limit:  limit,
-		Offset: offset,
-		Search: c.Query("search"),
-		Status: c.Query("status"),
+		Limit:        limit,
+		Offset:       offset,
+		Search:       c.Query("search"),
+		Status:       c.Query("status"),
+		DocumentType: c.Query("document_type"),
+		RiskLevel:    c.Query("risk_level"),
+		VendorName:   c.Query("vendor_name"),
+		BusinessUnit: c.Query("business_unit"),
+		SortBy:       c.Query("sort_by"),
+		SortOrder:    c.Query("sort_order"),
 	}
 
 	if isDepStr := c.Query("is_deprecated"); isDepStr != "" {
@@ -411,35 +418,50 @@ func (h *DocumentHandler) Summarize(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// UpdateMetadata godoc
-// @Summary Update Metadata Dokumen (Phase 1)
-// @Description Memperbarui metadata rich dari dokumen: kategori, risk level, vendor, divisi, tanggal.
-//
-//				Hanya dapat diakses oleh Admin dan Legal.
-//
+// UpdateRichMetadata godoc
+// @Summary Update Metadata AI (Manual)
+// @Description Memperbarui hasil ekstraksi AI secara manual.
 // @Tags Document
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "ID Dokumen"
-// @Param metadata body domain.DocumentRichMetadata true "Metadata yang ingin diperbarui"
-// @Success 200 {object} map[string]interface{} "Berhasil diperbarui"
-// @Failure 400 {object} map[string]interface{} "Bad Request"
-// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Param body body domain.DocumentRichMetadata true "Rich Metadata"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
 // @Router /documents/{id}/metadata [patch]
 func (h *DocumentHandler) UpdateMetadata(c *gin.Context) {
 	documentID := c.Param("id")
-
-	var meta domain.DocumentRichMetadata
-	if err := c.ShouldBindJSON(&meta); err != nil {
+	var req domain.DocumentRichMetadata
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.docUsecase.UpdateRichMetadata(c.Request.Context(), documentID, meta); err != nil {
+	err := h.docUsecase.UpdateRichMetadata(c.Request.Context(), documentID, req)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "metadata berhasil diperbarui"})
+	c.JSON(http.StatusOK, gin.H{"message": "metadata updated successfully"})
+}
+
+// GetMetadataOptions godoc
+// @Summary Ambil opsi metadata
+// @Description Mengambil daftar vendor dan business unit unik untuk dropdown filter
+// @Tags Document
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} domain.MetadataOptions
+// @Failure 500 {object} map[string]interface{}
+// @Router /documents/metadata-options [get]
+func (h *DocumentHandler) GetMetadataOptions(c *gin.Context) {
+	opts, err := h.docUsecase.GetMetadataOptions(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, opts)
 }
