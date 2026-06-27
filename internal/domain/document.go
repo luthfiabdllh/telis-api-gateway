@@ -26,6 +26,7 @@ type Document struct {
 	// Phase 1 — Rich Metadata (v2.0)
 	DocumentType  string     `json:"document_type,omitempty"`  // Kategori klasifikasi otomatis
 	RiskLevel     string     `json:"risk_level,omitempty"`     // LOW / MEDIUM / HIGH / UNKNOWN
+	RiskReasoning string     `json:"risk_reasoning,omitempty"` // Penjelasan dari LLM
 	VendorName    string     `json:"vendor_name,omitempty"`    // Nama pihak/vendor
 	BusinessUnit  string     `json:"business_unit,omitempty"` // Divisi terkait
 	EffectiveDate *time.Time `json:"effective_date,omitempty"` // Tanggal mulai berlaku
@@ -67,6 +68,19 @@ type DocumentClause struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+type RegulatoryImpact struct {
+	ID                 uuid.UUID `json:"id"`
+	RegulationID       uuid.UUID `json:"regulation_id"`
+	InternalDocumentID uuid.UUID `json:"internal_document_id"`
+	ImpactLevel        string    `json:"impact_level"`
+	ImpactReasoning    string    `json:"impact_reasoning"`
+	CreatedAt          time.Time `json:"created_at"`
+	
+	// Optional joined fields for UI
+	InternalDocumentName string `json:"internal_document_name,omitempty"`
+	InternalDocumentType string `json:"internal_document_type,omitempty"`
+}
+
 type DocumentRepository interface {
 	GetAll(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetByID(ctx context.Context, id string) (*Document, error)
@@ -76,6 +90,7 @@ type DocumentRepository interface {
 	CreatePendingDocument(ctx context.Context, doc *Document) error
 	RestoreDocument(ctx context.Context, id string) error
 	SaveDocumentSummary(ctx context.Context, id string, summary string) error // Phase 1
+	GetRegulatoryImpactsByRegulationID(ctx context.Context, regulationID string) ([]RegulatoryImpact, error)
 }
 
 type LegalEngineClient interface {
@@ -108,6 +123,7 @@ type DocumentUsecase interface {
 	GetDocumentFilePath(ctx context.Context, documentID string) (string, string, error) // Returns filePath, filename, error
 	SummarizeDocument(ctx context.Context, documentID string, force bool) (*DocumentSummaryResult, error) // Phase 1
 	GetDocumentClauses(ctx context.Context, documentID string) ([]DocumentClause, error) // Phase 2
+	GetRegulatoryImpacts(ctx context.Context, regulationID string) ([]RegulatoryImpact, error) // Phase 2
 }
 
 // DocumentSummaryResult is the structured output of the summarization endpoint

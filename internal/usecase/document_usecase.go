@@ -362,3 +362,7 @@ func (u *documentUsecase) ProcessWebhook(ctx context.Context, title string, url 
 
 	return u.publisher.Publish(ctx, "ingestion_queue", payload)
 }
+
+func (u *documentUsecase) GetRegulatoryImpacts(ctx context.Context, regulationID string) ([]domain.RegulatoryImpact, error) {
+	return u.repo.GetRegulatoryImpactsByRegulationID(ctx, regulationID)
+}

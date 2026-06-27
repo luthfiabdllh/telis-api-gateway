@@ -38,6 +38,7 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 		       d.created_at, d.updated_at, COALESCE(ft.folder_path, '') as folder_path,
 		       COALESCE(d.document_type, 'OTHER') as document_type,
 		       COALESCE(d.risk_level, 'UNKNOWN') as risk_level,
+		       COALESCE(d.risk_reasoning, '') as risk_reasoning,
 		       COALESCE(d.vendor_name, '') as vendor_name,
 		       COALESCE(d.business_unit, '') as business_unit,
 		       d.effective_date, d.expiry_date,
@@ -163,7 +164,7 @@ func (r *documentRepository) GetAll(ctx context.Context, filter domain.DocumentF
 			&doc.ID, &doc.FolderID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
 			&doc.FileSizeBytes, &doc.IsDeprecated, &doc.PreviousVersionID,
 			&doc.Version, &doc.CreatedAt, &doc.UpdatedAt, &doc.FolderPath,
-			&doc.DocumentType, &doc.RiskLevel, &doc.VendorName, &doc.BusinessUnit,
+			&doc.DocumentType, &doc.RiskLevel, &doc.RiskReasoning, &doc.VendorName, &doc.BusinessUnit,
 			&doc.EffectiveDate, &doc.ExpiryDate, &doc.Summary,
 		)
 		if err != nil {
@@ -181,6 +182,7 @@ func (r *documentRepository) GetByID(ctx context.Context, id string) (*domain.Do
 		       is_deprecated, previous_version_id, version, created_at, updated_at,
 		       COALESCE(document_type, 'OTHER') as document_type,
 		       COALESCE(risk_level, 'UNKNOWN') as risk_level,
+		       COALESCE(risk_reasoning, '') as risk_reasoning,
 		       COALESCE(vendor_name, '') as vendor_name,
 		       COALESCE(business_unit, '') as business_unit,
 		       effective_date, expiry_date,
@@ -192,7 +194,7 @@ func (r *documentRepository) GetByID(ctx context.Context, id string) (*domain.Do
 		&doc.ID, &doc.FolderID, &doc.Filename, &doc.FilePath, &doc.Status, &doc.UploadedBy,
 		&doc.FileSizeBytes, &doc.IsDeprecated, &doc.PreviousVersionID,
 		&doc.Version, &doc.CreatedAt, &doc.UpdatedAt,
-		&doc.DocumentType, &doc.RiskLevel, &doc.VendorName, &doc.BusinessUnit,
+		&doc.DocumentType, &doc.RiskLevel, &doc.RiskReasoning, &doc.VendorName, &doc.BusinessUnit,
 		&doc.EffectiveDate, &doc.ExpiryDate, &doc.Summary,
 	)
 
@@ -370,3 +372,46 @@ func (r *documentRepository) SaveDocumentSummary(ctx context.Context, id string,
 	return err
 }
 
+func (r *documentRepository) GetRegulatoryImpactsByRegulationID(ctx context.Context, regulationID string) ([]domain.RegulatoryImpact, error) {
+	query := `
+		SELECT 
+			ri.id, ri.regulation_id, ri.internal_document_id, ri.impact_level, ri.impact_reasoning, ri.created_at,
+			d.filename, d.document_type
+		FROM legal_engine.regulatory_impacts ri
+		JOIN ingestion.documents d ON ri.internal_document_id = d.id
+		WHERE ri.regulation_id = $1
+		ORDER BY ri.created_at DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query, regulationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var impacts []domain.RegulatoryImpact
+	for rows.Next() {
+		var impact domain.RegulatoryImpact
+		var filename sql.NullString
+		var docType sql.NullString
+
+		err := rows.Scan(
+			&impact.ID, &impact.RegulationID, &impact.InternalDocumentID,
+			&impact.ImpactLevel, &impact.ImpactReasoning, &impact.CreatedAt,
+			&filename, &docType,
+		)
+		if err != nil {
+			return nil, err
+		}
+		
+		if filename.Valid {
+			impact.InternalDocumentName = filename.String
+		}
+		if docType.Valid {
+			impact.InternalDocumentType = docType.String
+		}
+
+		impacts = append(impacts, impact)
+	}
+
+	return impacts, nil
+}

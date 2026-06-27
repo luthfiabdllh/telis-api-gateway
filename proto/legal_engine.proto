@@ -33,7 +33,29 @@ message GetClausesResponse {
     repeated Clause clauses = 1;
 }
 
+message ExtractMandatesRequest {
+    string regulation_id = 1;
+    string text = 2;
+}
+
+message ExtractMandatesResponse {
+    repeated string mandates = 1;
+}
+
+message AnalyzeImpactRequest {
+    string mandate_text = 1;
+    string internal_document_id = 2;
+    string internal_document_text = 3;
+}
+
+message AnalyzeImpactResponse {
+    string impact_level = 1; // HIGH, MEDIUM, LOW, NONE
+    string impact_reasoning = 2;
+}
+
 service LegalEngineService {
     rpc AnalyzeDocument(AnalyzeDocumentRequest) returns (AnalyzeDocumentResponse);
     rpc GetDocumentClauses(GetClausesRequest) returns (GetClausesResponse);
+    rpc ExtractRegulatoryMandates(ExtractMandatesRequest) returns (ExtractMandatesResponse);
+    rpc AnalyzeRegulatoryImpact(AnalyzeImpactRequest) returns (AnalyzeImpactResponse);
 }

@@ -26,6 +26,7 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.GET("/:id/download", handler.Download)
 		docRoutes.GET("/:id/summarize", handler.Summarize) // Phase 1
 		docRoutes.GET("/:id/clauses", handler.GetClauses) // Phase 2
+		docRoutes.GET("/:id/impacts", handler.GetImpacts) // Phase 2
 
 		docRoutes.POST("/upload", handler.Upload)
 		docRoutes.PATCH("/:id/metadata", handler.UpdateMetadata) // Phase 1
@@ -504,6 +505,31 @@ func (h *DocumentHandler) HandleWebhook(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"message": "webhook accepted and queued for processing",
+	})
+}
+
+// GetImpacts godoc
+// @Summary Mengambil Dokumen Terdampak Regulasi
+// @Description Mengambil daftar dokumen internal yang terdampak oleh sebuah regulasi (Phase 2).
+// @Tags Document
+// @Produce json
+// @Param id path string true "Regulation Document ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/v1/documents/{id}/impacts [get]
+// @Security BearerAuth
+func (h *DocumentHandler) GetImpacts(c *gin.Context) {
+	documentID := c.Param("id")
+
+	impacts, err := h.docUsecase.GetRegulatoryImpacts(c.Request.Context(), documentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": impacts,
 	})
 }
 
