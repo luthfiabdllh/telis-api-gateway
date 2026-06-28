@@ -60,7 +60,3 @@ func (u *metricsUsecase) GetRiskHeatmap(ctx context.Context) ([]domain.RiskHeatm
 func (u *metricsUsecase) GetExpiringContracts(ctx context.Context) ([]domain.ExpiringContract, error) {
 	return u.repo.GetExpiringContracts(ctx)
 }
-
-func (u *metricsUsecase) GetRegulatoryImpacts(ctx context.Context) ([]domain.DashboardRegulatoryImpact, error) {
-	return u.repo.GetRegulatoryImpacts(ctx)
-}

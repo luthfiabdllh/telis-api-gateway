@@ -351,18 +351,3 @@ func (u *documentUsecase) GetDocumentClauses(ctx context.Context, documentID str
 	}
 	return u.legalEngineClient.GetDocumentClauses(ctx, documentID)
 }
-
-func (u *documentUsecase) ProcessWebhook(ctx context.Context, title string, url string, publishedDate string) error {
-	payload := map[string]interface{}{
-		"action":         "crawl_regulation",
-		"title":          title,
-		"url":            url,
-		"published_date": publishedDate,
-	}
-
-	return u.publisher.Publish(ctx, "ingestion_queue", payload)
-}
-
-func (u *documentUsecase) GetRegulatoryImpacts(ctx context.Context, regulationID string) ([]domain.RegulatoryImpact, error) {
-	return u.repo.GetRegulatoryImpactsByRegulationID(ctx, regulationID)
-}

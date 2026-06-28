@@ -28,7 +28,6 @@ func NewMetricsHandler(r *gin.RouterGroup, metricsUsecase domain.MetricsUsecase)
 		// Phase 3 Analytics
 		metricsRoutes.GET("/risk-heatmap", middleware.RoleMiddleware("Admin", "Legal"), handler.GetRiskHeatmap)
 		metricsRoutes.GET("/expiring-contracts", middleware.RoleMiddleware("Admin", "Legal"), handler.GetExpiringContracts)
-		metricsRoutes.GET("/regulatory-impacts", middleware.RoleMiddleware("Admin", "Legal"), handler.GetRegulatoryImpacts)
 	}
 }
 
@@ -112,17 +111,4 @@ func (h *MetricsHandler) GetExpiringContracts(c *gin.Context) {
 	c.JSON(http.StatusOK, contracts)
 }
 
-// GetRegulatoryImpacts godoc
-// @Summary Dapatkan Dampak Regulasi Terbaru
-// @Tags Metrics
-// @Produce json
-// @Security BearerAuth
-// @Router /metrics/regulatory-impacts [get]
-func (h *MetricsHandler) GetRegulatoryImpacts(c *gin.Context) {
-	impacts, err := h.metricsUsecase.GetRegulatoryImpacts(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, impacts)
-}
+

@@ -215,35 +215,3 @@ func (r *metricsRepository) GetExpiringContracts(ctx context.Context) ([]domain.
 	}
 	return contracts, nil
 }
-
-func (r *metricsRepository) GetRegulatoryImpacts(ctx context.Context) ([]domain.DashboardRegulatoryImpact, error) {
-	query := `
-		SELECT 
-			ri.id, ri.impact_level, 
-			COALESCE(d1.filename, 'Unknown Regulation') as regulation_name, 
-			COALESCE(d2.filename, 'Unknown Document') as internal_document_name,
-			ri.created_at
-		FROM legal_engine.regulatory_impacts ri
-		LEFT JOIN ingestion.documents d1 ON ri.regulation_id = d1.id
-		LEFT JOIN ingestion.documents d2 ON ri.internal_document_id = d2.id
-		ORDER BY ri.created_at DESC
-		LIMIT 20
-	`
-	rows, err := r.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var impacts []domain.DashboardRegulatoryImpact
-	for rows.Next() {
-		var i domain.DashboardRegulatoryImpact
-		var createdAt time.Time
-		if err := rows.Scan(&i.ID, &i.ImpactLevel, &i.RegulationName, &i.InternalDocumentName, &createdAt); err != nil {
-			return nil, err
-		}
-		i.CreatedAt = createdAt.Format(time.RFC3339)
-		impacts = append(impacts, i)
-	}
-	return impacts, nil
-}

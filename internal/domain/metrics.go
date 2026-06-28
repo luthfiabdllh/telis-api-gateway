@@ -90,7 +90,6 @@ type MetricsRepository interface {
 	GetSystemOverview(ctx context.Context) (*SystemOverview, error)
 	GetRiskHeatmap(ctx context.Context) ([]RiskHeatmap, error)
 	GetExpiringContracts(ctx context.Context) ([]ExpiringContract, error)
-	GetRegulatoryImpacts(ctx context.Context) ([]DashboardRegulatoryImpact, error)
 }
 
 type MetricsUsecase interface {
@@ -98,5 +97,4 @@ type MetricsUsecase interface {
 	GetMyMetrics(ctx context.Context, userID string) (float64, error)
 	GetRiskHeatmap(ctx context.Context) ([]RiskHeatmap, error)
 	GetExpiringContracts(ctx context.Context) ([]ExpiringContract, error)
-	GetRegulatoryImpacts(ctx context.Context) ([]DashboardRegulatoryImpact, error)
 }

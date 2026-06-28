@@ -26,7 +26,6 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.GET("/:id/download", handler.Download)
 		docRoutes.GET("/:id/summarize", handler.Summarize) // Phase 1
 		docRoutes.GET("/:id/clauses", handler.GetClauses) // Phase 2
-		docRoutes.GET("/:id/impacts", handler.GetImpacts) // Phase 2
 
 		docRoutes.POST("/upload", handler.Upload)
 		docRoutes.PATCH("/:id/metadata", handler.UpdateMetadata) // Phase 1
@@ -42,10 +41,7 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.GET("/:id/approvals", handler.GetDocumentApprovals)
 	}
 
-	webhookRoutes := r.Group("/webhook")
-	{
-		webhookRoutes.POST("/regulations", handler.HandleWebhook)
-	}
+
 }
 
 // Upload godoc
@@ -478,65 +474,6 @@ func (h *DocumentHandler) GetMetadataOptions(c *gin.Context) {
 	c.JSON(http.StatusOK, opts)
 }
 
-type WebhookRegulationRequest struct {
-	Title         string `json:"title"`
-	Url           string `json:"url"`
-	PublishedDate string `json:"published_date"`
-}
-
-// HandleWebhook godoc
-// @Summary Handle Webhook Regulation
-// @Description Endpoint for receiving regulations updates from JDIH/BSSN
-// @Tags Webhook
-// @Accept json
-// @Produce json
-// @Param payload body WebhookRegulationRequest true "Webhook Payload"
-// @Success 202 {object} map[string]interface{}
-// @Failure 400 {object} map[string]interface{} "Bad Request"
-// @Failure 500 {object} map[string]interface{} "Internal Server Error"
-// @Router /webhook/regulations [post]
-func (h *DocumentHandler) HandleWebhook(c *gin.Context) {
-	var req WebhookRegulationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.docUsecase.ProcessWebhook(c.Request.Context(), req.Title, req.Url, req.PublishedDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusAccepted, gin.H{
-		"message": "webhook accepted and queued for processing",
-	})
-}
-
-// GetImpacts godoc
-// @Summary Mengambil Dokumen Terdampak Regulasi
-// @Description Mengambil daftar dokumen internal yang terdampak oleh sebuah regulasi (Phase 2).
-// @Tags Document
-// @Produce json
-// @Param id path string true "Regulation Document ID"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/v1/documents/{id}/impacts [get]
-// @Security BearerAuth
-func (h *DocumentHandler) GetImpacts(c *gin.Context) {
-	documentID := c.Param("id")
-
-	impacts, err := h.docUsecase.GetRegulatoryImpacts(c.Request.Context(), documentID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"data": impacts,
-	})
-}
 
 // GetClauses godoc
 // @Summary Ambil Klausul Dokumen

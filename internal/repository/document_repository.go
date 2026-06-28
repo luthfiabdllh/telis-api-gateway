@@ -372,49 +372,6 @@ func (r *documentRepository) SaveDocumentSummary(ctx context.Context, id string,
 	return err
 }
 
-func (r *documentRepository) GetRegulatoryImpactsByRegulationID(ctx context.Context, regulationID string) ([]domain.RegulatoryImpact, error) {
-	query := `
-		SELECT 
-			ri.id, ri.regulation_id, ri.internal_document_id, ri.impact_level, ri.impact_reasoning, ri.created_at,
-			d.filename, d.document_type
-		FROM legal_engine.regulatory_impacts ri
-		JOIN ingestion.documents d ON ri.internal_document_id = d.id
-		WHERE ri.regulation_id = $1
-		ORDER BY ri.created_at DESC
-	`
-	rows, err := r.db.QueryContext(ctx, query, regulationID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var impacts []domain.RegulatoryImpact
-	for rows.Next() {
-		var impact domain.RegulatoryImpact
-		var filename sql.NullString
-		var docType sql.NullString
-
-		err := rows.Scan(
-			&impact.ID, &impact.RegulationID, &impact.InternalDocumentID,
-			&impact.ImpactLevel, &impact.ImpactReasoning, &impact.CreatedAt,
-			&filename, &docType,
-		)
-		if err != nil {
-			return nil, err
-		}
-		
-		if filename.Valid {
-			impact.InternalDocumentName = filename.String
-		}
-		if docType.Valid {
-			impact.InternalDocumentType = docType.String
-		}
-
-		impacts = append(impacts, impact)
-	}
-
-	return impacts, nil
-}
 
 func (r *documentRepository) UpdateDocumentStatus(ctx context.Context, documentID string, status string) error {
 	query := `
