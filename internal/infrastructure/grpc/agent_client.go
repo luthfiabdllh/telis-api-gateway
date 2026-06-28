@@ -13,8 +13,11 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+	"github.com/sony/gobreaker"
 
 	"telis-api-gateway/pb"
+	"telis-api-gateway/pkg/circuitbreaker"
 )
 
 type AgentClient interface {
@@ -25,9 +28,10 @@ type AgentClient interface {
 }
 
 type agentClient struct {
-	conn        *grpc.ClientConn
-	client      pb.AgentServiceClient
+	conn         *grpc.ClientConn
+	client       pb.AgentServiceClient
 	agentHTTPURL string // e.g. http://localhost:8001 — used for non-streaming endpoints
+	cb           *gobreaker.CircuitBreaker
 }
 
 func NewAgentClient(url string) (AgentClient, error) {
@@ -51,11 +55,23 @@ func NewAgentClient(url string) (AgentClient, error) {
 		conn:         conn,
 		client:       client,
 		agentHTTPURL: agentHTTPURL,
+		cb:           circuitbreaker.NewCB("agent-service"),
 	}, nil
 }
 
 func (c *agentClient) ChatStream(ctx context.Context, req *pb.ChatRequest) (pb.AgentService_ChatStreamClient, error) {
-	return c.client.ChatStream(ctx, req)
+	// Pass Correlation-ID if exists
+	if correlationID, ok := ctx.Value("X-Correlation-ID").(string); ok {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-correlation-id", correlationID)
+	}
+
+	result, err := c.cb.Execute(func() (interface{}, error) {
+		return c.client.ChatStream(ctx, req)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(pb.AgentService_ChatStreamClient), nil
 }
 
 // SummarizeDocument calls the Agent Service HTTP endpoint (interim, until proto is regenerated).
@@ -67,30 +83,41 @@ func (c *agentClient) SummarizeDocument(ctx context.Context, documentID string, 
 		"document_type": documentType,
 	})
 
-	req, err := http.NewRequestWithContext(ctx, "POST",
-		fmt.Sprintf("%s/summarize", c.agentHTTPURL),
-		bytes.NewBuffer(body),
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to build summarize request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	result, err := c.cb.Execute(func() (interface{}, error) {
+		reqHTTP, errHTTP := http.NewRequestWithContext(ctx, "POST",
+			fmt.Sprintf("%s/summarize", c.agentHTTPURL),
+			bytes.NewBuffer(body),
+		)
+		if errHTTP != nil {
+			return "", fmt.Errorf("failed to build summarize request: %v", errHTTP)
+		}
+		reqHTTP.Header.Set("Content-Type", "application/json")
+		if correlationID, ok := ctx.Value("X-Correlation-ID").(string); ok {
+			reqHTTP.Header.Set("X-Correlation-ID", correlationID)
+		}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("summarize request failed: %v", err)
-	}
-	defer resp.Body.Close()
+		resp, errHTTP := http.DefaultClient.Do(reqHTTP)
+		if errHTTP != nil {
+			return "", fmt.Errorf("summarize request failed: %v", errHTTP)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("summarize returned status %d", resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("summarize returned status %d", resp.StatusCode)
+		}
+
+		resultBytes, errHTTP := io.ReadAll(resp.Body)
+		if errHTTP != nil {
+			return "", fmt.Errorf("failed to read summarize response: %v", errHTTP)
+		}
+		return string(resultBytes), nil
+	})
+
+	if err != nil {
+		return "", err
 	}
 
-	resultBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read summarize response: %v", err)
-	}
-	return string(resultBytes), nil
+	return result.(string), nil
 }
 
 func (c *agentClient) Close() error {

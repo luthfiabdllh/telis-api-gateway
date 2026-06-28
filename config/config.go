@@ -26,6 +26,7 @@ type Config struct {
 	RabbitMQURL         string
 	AgentServiceURL     string
 	LegalEngineURL      string
+	RedisURL            string
 }
 
 func LoadConfig() *Config {
@@ -51,6 +52,7 @@ func LoadConfig() *Config {
 		RabbitMQURL:         getEnv("RABBITMQ_URL", "amqp://telis_rmq:telis_secret_rmq@localhost:5672/"),
 		AgentServiceURL:     getEnv("AGENT_SERVICE_URL", "localhost:8001"),
 		LegalEngineURL:      getEnv("LEGAL_ENGINE_GRPC_URL", "localhost:50054"),
+		RedisURL:            getEnv("REDIS_URL", "redis://localhost:6379"),
 	}
 }
 

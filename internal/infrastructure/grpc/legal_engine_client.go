@@ -8,13 +8,17 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+	"github.com/sony/gobreaker"
 
 	"telis-api-gateway/internal/domain"
 	"telis-api-gateway/pb"
+	"telis-api-gateway/pkg/circuitbreaker"
 )
 
 type legalEngineClient struct {
 	client pb.LegalEngineServiceClient
+	cb     *gobreaker.CircuitBreaker
 }
 
 func NewLegalEngineClient(targetURL string) (domain.LegalEngineClient, error) {
@@ -23,28 +27,40 @@ func NewLegalEngineClient(targetURL string) (domain.LegalEngineClient, error) {
 		return nil, err
 	}
 	client := pb.NewLegalEngineServiceClient(conn)
-	return &legalEngineClient{client: client}, nil
+	return &legalEngineClient{
+		client: client,
+		cb:     circuitbreaker.NewCB("legal-engine"),
+	}, nil
 }
 
 func (c *legalEngineClient) GetDocumentClauses(ctx context.Context, documentID string) ([]domain.DocumentClause, error) {
 	req := &pb.GetClausesRequest{DocumentId: documentID}
 	
+	// Pass Correlation-ID if exists
+	if correlationID, ok := ctx.Value("X-Correlation-ID").(string); ok {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-correlation-id", correlationID)
+	}
+	
 	// Add timeout context
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	resp, err := c.client.GetDocumentClauses(ctx, req)
+	result, err := c.cb.Execute(func() (interface{}, error) {
+		return c.client.GetDocumentClauses(ctx, req)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get clauses from legal engine: %w", err)
 	}
+	
+	resp := result.(*pb.GetClausesResponse)
 
-	var result []domain.DocumentClause
+	var resultClauses []domain.DocumentClause
 	for _, clause := range resp.Clauses {
 		id, _ := uuid.Parse(clause.Id)
 		docID, _ := uuid.Parse(clause.DocumentId)
 		createdAt, _ := time.Parse(time.RFC3339, clause.CreatedAt)
 
-		result = append(result, domain.DocumentClause{
+		resultClauses = append(resultClauses, domain.DocumentClause{
 			ID:            id,
 			DocumentID:    docID,
 			ClauseType:    clause.ClauseType,
@@ -55,5 +71,5 @@ func (c *legalEngineClient) GetDocumentClauses(ctx context.Context, documentID s
 		})
 	}
 
-	return result, nil
+	return resultClauses, nil
 }

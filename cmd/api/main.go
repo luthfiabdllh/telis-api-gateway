@@ -7,6 +7,7 @@ import (
 	"telis-api-gateway/internal/delivery/http"
 	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
 	"telis-api-gateway/internal/infrastructure/rabbitmq"
+	"telis-api-gateway/internal/infrastructure/redis"
 	"telis-api-gateway/internal/repository"
 	"telis-api-gateway/internal/usecase"
 	"telis-api-gateway/internal/domain"
@@ -75,6 +76,13 @@ func main() {
 	}
 	log.Println("Successfully initialized gRPC Legal Engine Client")
 
+	redisClient, err := redis.NewRedisClient(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redisClient.Close()
+	log.Println("Successfully connected to Redis")
+
 	// 4. Dependency Injection (Wiring)
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -104,7 +112,7 @@ func main() {
 	chatUsecase := usecase.NewChatUsecase(chatRepo)
 
 	// 5. Setup Gin Router & Delivery Layer (Layer 4)
-	router := http.SetupRouter(cfg, authUsecase, userUsecase, docUsecase, redlineUsecase, feedbackUsecase, metricsUsecase, folderUsecase, chatUsecase, agentClient)
+	router := http.SetupRouter(cfg, authUsecase, userUsecase, docUsecase, redlineUsecase, feedbackUsecase, metricsUsecase, folderUsecase, chatUsecase, agentClient, redisClient)
 
 	// 5. Start Server
 	log.Printf("Starting API Gateway on port %s", cfg.Port)
