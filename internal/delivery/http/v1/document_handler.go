@@ -35,6 +35,11 @@ func NewDocumentHandler(r *gin.RouterGroup, docUsecase domain.DocumentUsecase) {
 		docRoutes.POST("/:id/restore", handler.Restore)
 		docRoutes.PUT("/:id/rename", handler.Rename)
 		docRoutes.PUT("/:id/move", handler.Move)
+		
+		// Phase 3 Approvals
+		docRoutes.POST("/:id/approvals", handler.RequestApproval)
+		docRoutes.PUT("/:id/approvals/:aid", handler.ReviewApproval)
+		docRoutes.GET("/:id/approvals", handler.GetDocumentApprovals)
 	}
 
 	webhookRoutes := r.Group("/webhook")

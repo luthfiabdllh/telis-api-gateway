@@ -81,6 +81,18 @@ type RegulatoryImpact struct {
 	InternalDocumentType string `json:"internal_document_type,omitempty"`
 }
 
+// Phase 3: Approval Workflows
+type ApprovalWorkflow struct {
+	ID          uuid.UUID `json:"id"`
+	DocumentID  uuid.UUID `json:"document_id"`
+	RequesterID uuid.UUID `json:"requester_id"`
+	ApproverID  uuid.UUID `json:"approver_id"`
+	Status      string    `json:"status"` // PENDING_REVIEW, APPROVED, REJECTED
+	Notes       string    `json:"notes"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 type DocumentRepository interface {
 	GetAll(ctx context.Context, filter DocumentFilter) ([]Document, int, error)
 	GetByID(ctx context.Context, id string) (*Document, error)
@@ -91,6 +103,11 @@ type DocumentRepository interface {
 	RestoreDocument(ctx context.Context, id string) error
 	SaveDocumentSummary(ctx context.Context, id string, summary string) error // Phase 1
 	GetRegulatoryImpactsByRegulationID(ctx context.Context, regulationID string) ([]RegulatoryImpact, error)
+	
+	// Phase 3 Approvals
+	CreateApprovalWorkflow(ctx context.Context, approval *ApprovalWorkflow) error
+	UpdateApprovalWorkflowStatus(ctx context.Context, id string, status string, notes string) error
+	GetApprovalsByDocumentID(ctx context.Context, documentID string) ([]ApprovalWorkflow, error)
 }
 
 type LegalEngineClient interface {
@@ -124,6 +141,11 @@ type DocumentUsecase interface {
 	SummarizeDocument(ctx context.Context, documentID string, force bool) (*DocumentSummaryResult, error) // Phase 1
 	GetDocumentClauses(ctx context.Context, documentID string) ([]DocumentClause, error) // Phase 2
 	GetRegulatoryImpacts(ctx context.Context, regulationID string) ([]RegulatoryImpact, error) // Phase 2
+	
+	// Phase 3 Approvals
+	RequestApproval(ctx context.Context, documentID string, requesterID string, approverID string, notes string) (*ApprovalWorkflow, error)
+	ReviewApproval(ctx context.Context, approvalID string, reviewerID string, status string, notes string) error
+	GetDocumentApprovals(ctx context.Context, documentID string) ([]ApprovalWorkflow, error)
 }
 
 // DocumentSummaryResult is the structured output of the summarization endpoint

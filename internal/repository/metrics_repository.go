@@ -157,3 +157,93 @@ func (r *metricsRepository) GetSystemOverview(ctx context.Context) (*domain.Syst
 
 	return overview, nil
 }
+
+func (r *metricsRepository) GetRiskHeatmap(ctx context.Context) ([]domain.RiskHeatmap, error) {
+	query := `
+		SELECT 
+			COALESCE(business_unit, 'Unspecified') as business_unit,
+			COALESCE(document_type, 'OTHER') as document_type,
+			COALESCE(risk_level, 'UNKNOWN') as risk_level,
+			COUNT(*) as count
+		FROM ingestion.documents 
+		WHERE status != 'DELETED' AND is_deprecated = FALSE
+		GROUP BY business_unit, document_type, risk_level
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var heatmap []domain.RiskHeatmap
+	for rows.Next() {
+		var h domain.RiskHeatmap
+		if err := rows.Scan(&h.BusinessUnit, &h.DocumentType, &h.RiskLevel, &h.Count); err != nil {
+			return nil, err
+		}
+		heatmap = append(heatmap, h)
+	}
+	return heatmap, nil
+}
+
+func (r *metricsRepository) GetExpiringContracts(ctx context.Context) ([]domain.ExpiringContract, error) {
+	query := `
+		SELECT 
+			id, filename, COALESCE(document_type, ''), COALESCE(risk_level, ''), COALESCE(vendor_name, ''), expiry_date 
+		FROM ingestion.documents 
+		WHERE expiry_date IS NOT NULL 
+		AND expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+		AND status != 'DELETED' AND is_deprecated = FALSE
+		ORDER BY expiry_date ASC
+		LIMIT 20
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var contracts []domain.ExpiringContract
+	for rows.Next() {
+		var c domain.ExpiringContract
+		var expiryDate time.Time
+		if err := rows.Scan(&c.ID, &c.Filename, &c.DocumentType, &c.RiskLevel, &c.VendorName, &expiryDate); err != nil {
+			return nil, err
+		}
+		c.ExpiryDate = expiryDate.Format(time.RFC3339)
+		contracts = append(contracts, c)
+	}
+	return contracts, nil
+}
+
+func (r *metricsRepository) GetRegulatoryImpacts(ctx context.Context) ([]domain.DashboardRegulatoryImpact, error) {
+	query := `
+		SELECT 
+			ri.id, ri.impact_level, 
+			COALESCE(d1.filename, 'Unknown Regulation') as regulation_name, 
+			COALESCE(d2.filename, 'Unknown Document') as internal_document_name,
+			ri.created_at
+		FROM legal_engine.regulatory_impacts ri
+		LEFT JOIN ingestion.documents d1 ON ri.regulation_id = d1.id
+		LEFT JOIN ingestion.documents d2 ON ri.internal_document_id = d2.id
+		ORDER BY ri.created_at DESC
+		LIMIT 20
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var impacts []domain.DashboardRegulatoryImpact
+	for rows.Next() {
+		var i domain.DashboardRegulatoryImpact
+		var createdAt time.Time
+		if err := rows.Scan(&i.ID, &i.ImpactLevel, &i.RegulationName, &i.InternalDocumentName, &createdAt); err != nil {
+			return nil, err
+		}
+		i.CreatedAt = createdAt.Format(time.RFC3339)
+		impacts = append(impacts, i)
+	}
+	return impacts, nil
+}

@@ -52,3 +52,15 @@ func (u *metricsUsecase) GetDashboardMetrics(ctx context.Context) (*domain.Dashb
 func (u *metricsUsecase) GetMyMetrics(ctx context.Context, userID string) (float64, error) {
 	return u.repo.GetMyTotalCostThisMonth(ctx, userID)
 }
+
+func (u *metricsUsecase) GetRiskHeatmap(ctx context.Context) ([]domain.RiskHeatmap, error) {
+	return u.repo.GetRiskHeatmap(ctx)
+}
+
+func (u *metricsUsecase) GetExpiringContracts(ctx context.Context) ([]domain.ExpiringContract, error) {
+	return u.repo.GetExpiringContracts(ctx)
+}
+
+func (u *metricsUsecase) GetRegulatoryImpacts(ctx context.Context) ([]domain.DashboardRegulatoryImpact, error) {
+	return u.repo.GetRegulatoryImpacts(ctx)
+}

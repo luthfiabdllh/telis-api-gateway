@@ -47,6 +47,30 @@ type SystemOverview struct {
 	UserRoleDist   []UserRoleDist
 }
 
+type RiskHeatmap struct {
+	BusinessUnit string `json:"business_unit"`
+	DocumentType string `json:"document_type"`
+	RiskLevel    string `json:"risk_level"`
+	Count        int    `json:"count"`
+}
+
+type ExpiringContract struct {
+	ID          string  `json:"id"`
+	Filename    string  `json:"filename"`
+	DocumentType string  `json:"document_type"`
+	RiskLevel   string  `json:"risk_level"`
+	VendorName  string  `json:"vendor_name"`
+	ExpiryDate  string  `json:"expiry_date"`
+}
+
+type DashboardRegulatoryImpact struct {
+	ID                   string `json:"id"`
+	ImpactLevel          string `json:"impact_level"`
+	RegulationName       string `json:"regulation_name"`
+	InternalDocumentName string `json:"internal_document_name"`
+	CreatedAt            string `json:"created_at"`
+}
+
 type DashboardMetrics struct {
 	TotalCostThisMonth float64         `json:"total_cost_this_month"`
 	TopUsers           []UserCost      `json:"top_users"`
@@ -64,9 +88,15 @@ type MetricsRepository interface {
 	GetDailyUsageTrend(ctx context.Context, days int) ([]DailyUsage, error)
 	GetMyTotalCostThisMonth(ctx context.Context, userID string) (float64, error)
 	GetSystemOverview(ctx context.Context) (*SystemOverview, error)
+	GetRiskHeatmap(ctx context.Context) ([]RiskHeatmap, error)
+	GetExpiringContracts(ctx context.Context) ([]ExpiringContract, error)
+	GetRegulatoryImpacts(ctx context.Context) ([]DashboardRegulatoryImpact, error)
 }
 
 type MetricsUsecase interface {
 	GetDashboardMetrics(ctx context.Context) (*DashboardMetrics, error)
 	GetMyMetrics(ctx context.Context, userID string) (float64, error)
+	GetRiskHeatmap(ctx context.Context) ([]RiskHeatmap, error)
+	GetExpiringContracts(ctx context.Context) ([]ExpiringContract, error)
+	GetRegulatoryImpacts(ctx context.Context) ([]DashboardRegulatoryImpact, error)
 }

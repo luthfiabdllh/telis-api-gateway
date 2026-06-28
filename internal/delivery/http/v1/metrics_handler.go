@@ -24,6 +24,11 @@ func NewMetricsHandler(r *gin.RouterGroup, metricsUsecase domain.MetricsUsecase)
 		metricsRoutes.GET("/tokens", middleware.RoleMiddleware("Admin"), handler.GetDashboardMetrics)
 		// Any logged-in user can see their own metrics
 		metricsRoutes.GET("/tokens/me", handler.GetMyMetrics)
+		
+		// Phase 3 Analytics
+		metricsRoutes.GET("/risk-heatmap", middleware.RoleMiddleware("Admin", "Legal"), handler.GetRiskHeatmap)
+		metricsRoutes.GET("/expiring-contracts", middleware.RoleMiddleware("Admin", "Legal"), handler.GetExpiringContracts)
+		metricsRoutes.GET("/regulatory-impacts", middleware.RoleMiddleware("Admin", "Legal"), handler.GetRegulatoryImpacts)
 	}
 }
 
@@ -75,4 +80,49 @@ func (h *MetricsHandler) GetMyMetrics(c *gin.Context) {
 		"user_id":               userID,
 		"total_cost_this_month": totalCost,
 	})
+}
+
+// GetRiskHeatmap godoc
+// @Summary Dapatkan Heatmap Risiko
+// @Tags Metrics
+// @Produce json
+// @Security BearerAuth
+// @Router /metrics/risk-heatmap [get]
+func (h *MetricsHandler) GetRiskHeatmap(c *gin.Context) {
+	heatmap, err := h.metricsUsecase.GetRiskHeatmap(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, heatmap)
+}
+
+// GetExpiringContracts godoc
+// @Summary Dapatkan Kontrak yang Akan Kedaluwarsa
+// @Tags Metrics
+// @Produce json
+// @Security BearerAuth
+// @Router /metrics/expiring-contracts [get]
+func (h *MetricsHandler) GetExpiringContracts(c *gin.Context) {
+	contracts, err := h.metricsUsecase.GetExpiringContracts(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, contracts)
+}
+
+// GetRegulatoryImpacts godoc
+// @Summary Dapatkan Dampak Regulasi Terbaru
+// @Tags Metrics
+// @Produce json
+// @Security BearerAuth
+// @Router /metrics/regulatory-impacts [get]
+func (h *MetricsHandler) GetRegulatoryImpacts(c *gin.Context) {
+	impacts, err := h.metricsUsecase.GetRegulatoryImpacts(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, impacts)
 }
