@@ -69,16 +69,13 @@ func (h *MetricsHandler) GetMyMetrics(c *gin.Context) {
 		return
 	}
 
-	totalCost, err := h.metricsUsecase.GetMyMetrics(c.Request.Context(), userID.(string))
+	myMetrics, err := h.metricsUsecase.GetMyMetrics(c.Request.Context(), userID.(string))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"user_id":               userID,
-		"total_cost_this_month": totalCost,
-	})
+	c.JSON(http.StatusOK, myMetrics)
 }
 
 // GetRiskHeatmap godoc

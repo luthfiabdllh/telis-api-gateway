@@ -49,8 +49,27 @@ func (u *metricsUsecase) GetDashboardMetrics(ctx context.Context) (*domain.Dashb
 	}, nil
 }
 
-func (u *metricsUsecase) GetMyMetrics(ctx context.Context, userID string) (float64, error) {
-	return u.repo.GetMyTotalCostThisMonth(ctx, userID)
+func (u *metricsUsecase) GetMyMetrics(ctx context.Context, userID string) (*domain.MyMetrics, error) {
+	totalCost, err := u.repo.GetMyTotalCostThisMonth(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	dailyTrend, err := u.repo.GetMyDailyUsageTrend(ctx, userID, 30) // last 30 days
+	if err != nil {
+		return nil, err
+	}
+
+	recentActivities, err := u.repo.GetMyRecentActivity(ctx, userID, 5) // top 5 recent
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.MyMetrics{
+		TotalCostThisMonth: totalCost,
+		DailyTrend:         dailyTrend,
+		RecentActivities:   recentActivities,
+	}, nil
 }
 
 func (u *metricsUsecase) GetRiskHeatmap(ctx context.Context) ([]domain.RiskHeatmap, error) {

@@ -100,6 +100,59 @@ func (r *metricsRepository) GetMyTotalCostThisMonth(ctx context.Context, userID 
 	return total, nil
 }
 
+func (r *metricsRepository) GetMyDailyUsageTrend(ctx context.Context, userID string, days int) ([]domain.DailyUsage, error) {
+	query := `
+		SELECT DATE(timestamp) as date, SUM(total_tokens) as total_tokens, SUM(cost_usd) as cost_usd
+		FROM agent.token_metrics
+		WHERE user_id = $1 AND timestamp >= CURRENT_DATE - interval '1 day' * $2
+		GROUP BY DATE(timestamp)
+		ORDER BY DATE(timestamp) ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, userID, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var trends []domain.DailyUsage
+	for rows.Next() {
+		var d domain.DailyUsage
+		var date time.Time
+		if err := rows.Scan(&date, &d.TotalTokens, &d.CostUSD); err != nil {
+			return nil, err
+		}
+		d.Date = date.Format("2006-01-02")
+		trends = append(trends, d)
+	}
+	return trends, nil
+}
+
+func (r *metricsRepository) GetMyRecentActivity(ctx context.Context, userID string, limit int) ([]domain.RecentActivity, error) {
+	// Let's use token_metrics to approximate recent activity
+	query := `
+		SELECT id, COALESCE(model_name, 'Chat') as type, 'Sesi AI' as title, total_tokens, cost_usd, timestamp
+		FROM agent.token_metrics
+		WHERE user_id = $1
+		ORDER BY timestamp DESC
+		LIMIT $2
+	`
+	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var activities []domain.RecentActivity
+	for rows.Next() {
+		var a domain.RecentActivity
+		if err := rows.Scan(&a.ID, &a.Type, &a.Title, &a.Tokens, &a.CostUSD, &a.Timestamp); err != nil {
+			return nil, err
+		}
+		activities = append(activities, a)
+	}
+	return activities, nil
+}
+
 func (r *metricsRepository) GetSystemOverview(ctx context.Context) (*domain.SystemOverview, error) {
 	overview := &domain.SystemOverview{}
 
