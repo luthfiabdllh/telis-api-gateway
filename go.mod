@@ -1,6 +1,6 @@
 module telis-api-gateway
 
-go 1.26.2
+go 1.25.0
 
 require (
 	github.com/gin-contrib/cors v1.7.7

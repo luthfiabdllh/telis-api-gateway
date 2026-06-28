@@ -2,7 +2,7 @@
 # Stage 1: Builder
 # Build binary Go dari source code
 # ============================================================
-FROM golang:1.24-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /app
 
