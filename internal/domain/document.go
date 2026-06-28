@@ -108,6 +108,7 @@ type DocumentRepository interface {
 	CreateApprovalWorkflow(ctx context.Context, approval *ApprovalWorkflow) error
 	UpdateApprovalWorkflowStatus(ctx context.Context, id string, status string, notes string) error
 	GetApprovalsByDocumentID(ctx context.Context, documentID string) ([]ApprovalWorkflow, error)
+	UpdateDocumentStatus(ctx context.Context, documentID string, status string) error
 }
 
 type LegalEngineClient interface {
@@ -144,7 +145,7 @@ type DocumentUsecase interface {
 	
 	// Phase 3 Approvals
 	RequestApproval(ctx context.Context, documentID string, requesterID string, approverID string, notes string) (*ApprovalWorkflow, error)
-	ReviewApproval(ctx context.Context, approvalID string, reviewerID string, status string, notes string) error
+	ReviewApproval(ctx context.Context, documentID string, approvalID string, reviewerID string, status string, notes string) error
 	GetDocumentApprovals(ctx context.Context, documentID string) ([]ApprovalWorkflow, error)
 }
 

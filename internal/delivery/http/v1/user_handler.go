@@ -22,6 +22,7 @@ func NewUserHandler(r *gin.RouterGroup, userUsecase domain.UserUsecase) {
 	userRoutes := r.Group("/users")
 	{
 		userRoutes.GET("", handler.GetAll)
+		userRoutes.GET("/search", handler.Search)
 		userRoutes.PUT("/:id/role", handler.UpdateRole)
 		userRoutes.PUT("/:id/ban", handler.UpdateStatus)
 	}
@@ -88,6 +89,36 @@ func (h *UserHandler) GetAll(c *gin.Context) {
 			"total": total,
 		},
 	})
+}
+
+// Search godoc
+// @Summary Cari pengguna untuk Autocomplete
+// @Description Mencari pengguna berdasarkan username atau email
+// @Tags Users
+// @Produce json
+// @Security BearerAuth
+// @Param q query string false "Kata kunci pencarian"
+// @Success 200 {array} map[string]interface{} "Daftar pengguna (id, username, email)"
+// @Router /users/search [get]
+func (h *UserHandler) Search(c *gin.Context) {
+	search := c.Query("q")
+
+	users, _, err := h.userUsecase.GetAllUsers(c.Request.Context(), 1, 20, search, nil, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var results []map[string]interface{}
+	for _, u := range users {
+		results = append(results, map[string]interface{}{
+			"id":       u.ID,
+			"username": u.Username,
+			"email":    u.Email,
+		})
+	}
+
+	c.JSON(http.StatusOK, results)
 }
 
 type UpdateRoleRequest struct {

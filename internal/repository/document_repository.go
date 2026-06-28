@@ -415,3 +415,13 @@ func (r *documentRepository) GetRegulatoryImpactsByRegulationID(ctx context.Cont
 
 	return impacts, nil
 }
+
+func (r *documentRepository) UpdateDocumentStatus(ctx context.Context, documentID string, status string) error {
+	query := `
+		UPDATE ingestion.documents 
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+	_, err := r.db.ExecContext(ctx, query, status, documentID)
+	return err
+}

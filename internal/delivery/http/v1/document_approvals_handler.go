@@ -57,6 +57,7 @@ func (h *DocumentHandler) RequestApproval(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /documents/{id}/approvals/{aid} [put]
 func (h *DocumentHandler) ReviewApproval(c *gin.Context) {
+	docID := c.Param("id")
 	approvalID := c.Param("aid")
 	userID := c.GetString("user_id")
 
@@ -66,7 +67,7 @@ func (h *DocumentHandler) ReviewApproval(c *gin.Context) {
 		return
 	}
 
-	if err := h.docUsecase.ReviewApproval(c.Request.Context(), approvalID, userID, req.Status, req.Notes); err != nil {
+	if err := h.docUsecase.ReviewApproval(c.Request.Context(), docID, approvalID, userID, req.Status, req.Notes); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

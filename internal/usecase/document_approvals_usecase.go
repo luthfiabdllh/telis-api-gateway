@@ -33,11 +33,27 @@ func (u *documentUsecase) RequestApproval(ctx context.Context, documentID string
 		return nil, err
 	}
 
+	// State machine approval: Update document status
+	if err := u.repo.UpdateDocumentStatus(ctx, documentID, "PENDING_APPROVAL"); err != nil {
+		return nil, err
+	}
+
 	return approval, nil
 }
 
-func (u *documentUsecase) ReviewApproval(ctx context.Context, approvalID string, reviewerID string, status string, notes string) error {
-	return u.repo.UpdateApprovalWorkflowStatus(ctx, approvalID, status, notes)
+func (u *documentUsecase) ReviewApproval(ctx context.Context, documentID string, approvalID string, reviewerID string, status string, notes string) error {
+	err := u.repo.UpdateApprovalWorkflowStatus(ctx, approvalID, status, notes)
+	if err != nil {
+		return err
+	}
+
+	// Update document status based on approval outcome
+	if status == "APPROVED" || status == "REJECTED" {
+		if err := u.repo.UpdateDocumentStatus(ctx, documentID, status); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (u *documentUsecase) GetDocumentApprovals(ctx context.Context, documentID string) ([]domain.ApprovalWorkflow, error) {
