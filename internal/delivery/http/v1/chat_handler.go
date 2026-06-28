@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"bytes"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ledongthuc/pdf"
 
 	"telis-api-gateway/internal/domain"
 	grpcClient "telis-api-gateway/internal/infrastructure/grpc"
@@ -34,6 +36,7 @@ func NewChatHandler(r *gin.RouterGroup, agentClient grpcClient.AgentClient, chat
 		chatRoutes.GET("/sessions/:id/messages", handler.GetSessionMessages)
 		chatRoutes.PUT("/sessions/:id/title", handler.RenameSession)
 		chatRoutes.DELETE("/sessions/:id", handler.DeleteSession)
+		chatRoutes.POST("/extract-text", handler.ExtractText)
 	}
 }
 
@@ -42,6 +45,7 @@ type ChatPayload struct {
 	Message         string   `json:"message" binding:"required"`
 	DocumentFilters []string `json:"document_filters"`
 	LLMTemperature  float32  `json:"llm_temperature"`
+	ContextData     string   `json:"context_data"`
 }
 
 // ChatStream godoc
@@ -89,10 +93,15 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 	}
 
 	// 3. Forward to Agent via gRPC
+	finalMessage := req.Message
+	if req.ContextData != "" {
+		finalMessage = fmt.Sprintf("%s\n\n--- DOKUMEN LAMPIRAN ---\n%s", req.Message, req.ContextData)
+	}
+
 	grpcReq := &pb.ChatRequest{
 		SessionId:       req.SessionID,
 		UserId:          userIDStr.(string),
-		Message:         req.Message,
+		Message:         finalMessage,
 		DocumentFilters: req.DocumentFilters,
 		LlmTemperature:  req.LLMTemperature,
 	}
@@ -326,3 +335,80 @@ func (h *ChatHandler) DeleteSession(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "session deleted successfully"})
 }
+
+// ExtractText godoc
+// @Summary Ekstrak Teks dari PDF
+// @Description Mengekstrak teks dari file PDF yang diunggah secara ad-hoc untuk disisipkan ke dalam context LLM.
+// @Tags Chat
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param file formData file true "File PDF"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{} "Bad Request"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Router /chat/extract-text [post]
+func (h *ChatHandler) ExtractText(c *gin.Context) {
+	_, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in token"})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+
+	if file.Header.Get("Content-Type") != "application/pdf" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only PDF format is supported"})
+		return
+	}
+
+	f, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to open file"})
+		return
+	}
+	defer f.Close()
+
+	// Parse PDF
+	// Convert multipart.File to bytes.Reader for pdf library
+	buf := bytes.NewBuffer(nil)
+	if _, err := io.Copy(buf, f); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read file content"})
+		return
+	}
+	
+	reader := bytes.NewReader(buf.Bytes())
+	pdfReader, err := pdf.NewReader(reader, reader.Size())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse pdf file"})
+		return
+	}
+	
+	var textBuilder strings.Builder
+	numPages := pdfReader.NumPage()
+	for i := 1; i <= numPages; i++ {
+		p := pdfReader.Page(i)
+		if p.V.IsNull() {
+			continue
+		}
+		
+		content, _ := p.GetPlainText(nil)
+		textBuilder.WriteString(content)
+		textBuilder.WriteString("\n")
+	}
+
+	extractedText := strings.TrimSpace(textBuilder.String())
+	if len(extractedText) > 10000 {
+		// Truncate if it's too large to prevent blowing up the JSON payload and LLM context
+		extractedText = extractedText[:10000] + "\n...[Teks terpotong karena terlalu panjang]..."
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"text": extractedText,
+	})
+}
+
