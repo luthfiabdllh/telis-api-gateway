@@ -124,7 +124,10 @@ func main() {
 	metricsUsecase := usecase.NewMetricsUsecase(metricsRepo)
 	
 	// Base dir for shared documents
-	sharedDocsDir := "../shared_docs" // Assuming running from root of telis-api-gateway
+	sharedDocsDir := os.Getenv("SHARED_DOCS_PATH")
+	if sharedDocsDir == "" {
+		sharedDocsDir = "../shared_docs" // Default fallback
+	}
 	docUsecase := usecase.NewDocumentUsecase(rmqPublisher, documentRepo, sharedDocsDir, agentClient, legalEngineClient)
 	folderUsecase := usecase.NewFolderUsecase(folderRepo, docUsecase)
 	redlineUsecase := usecase.NewRedlineUsecase(redlineRepo, rmqPublisher, sharedDocsDir)
