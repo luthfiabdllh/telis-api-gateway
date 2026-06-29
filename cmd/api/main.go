@@ -44,7 +44,7 @@ func main() {
 	// JAEGER_URL could be injected via ENV, default to jaeger:4317 in docker
 	jaegerURL := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if jaegerURL == "" {
-		jaegerURL = "http://jaeger:4317"
+		jaegerURL = "jaeger:4317"
 	}
 	tp, err := telemetry.InitTracer("api-gateway", jaegerURL)
 	if err != nil {
