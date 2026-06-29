@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"github.com/sony/gobreaker"
 
 	"telis-api-gateway/internal/domain"
@@ -22,7 +22,10 @@ type legalEngineClient struct {
 }
 
 func NewLegalEngineClient(targetURL string) (domain.LegalEngineClient, error) {
-	conn, err := grpc.Dial(targetURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(targetURL, 
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -35,11 +38,6 @@ func NewLegalEngineClient(targetURL string) (domain.LegalEngineClient, error) {
 
 func (c *legalEngineClient) GetDocumentClauses(ctx context.Context, documentID string) ([]domain.DocumentClause, error) {
 	req := &pb.GetClausesRequest{DocumentId: documentID}
-	
-	// Pass Correlation-ID if exists
-	if correlationID, ok := ctx.Value("X-Correlation-ID").(string); ok {
-		ctx = metadata.AppendToOutgoingContext(ctx, "x-correlation-id", correlationID)
-	}
 	
 	// Add timeout context
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
 
 	"telis-api-gateway/config"
 	"telis-api-gateway/internal/delivery/http"
@@ -11,6 +13,7 @@ import (
 	"telis-api-gateway/internal/repository"
 	"telis-api-gateway/internal/usecase"
 	"telis-api-gateway/internal/domain"
+	"telis-api-gateway/pkg/telemetry"
 	_ "telis-api-gateway/docs" // Swagger docs
 )
 
@@ -36,6 +39,22 @@ import (
 func main() {
 	// 1. Load Configurations (.env)
 	cfg := config.LoadConfig()
+
+	// 1b. Initialize OpenTelemetry
+	// JAEGER_URL could be injected via ENV, default to jaeger:4317 in docker
+	jaegerURL := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if jaegerURL == "" {
+		jaegerURL = "http://jaeger:4317"
+	}
+	tp, err := telemetry.InitTracer("api-gateway", jaegerURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize telemetry: %v", err)
+	}
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+		}
+	}()
 
 	// 2. Setup Database Connection
 	db, err := config.ConnectDB(cfg)

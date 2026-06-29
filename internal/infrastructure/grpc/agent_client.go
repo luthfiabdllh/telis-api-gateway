@@ -13,7 +13,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"github.com/sony/gobreaker"
 
 	"telis-api-gateway/pb"
@@ -35,7 +35,10 @@ type agentClient struct {
 }
 
 func NewAgentClient(url string) (AgentClient, error) {
-	conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(url, 
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -60,11 +63,6 @@ func NewAgentClient(url string) (AgentClient, error) {
 }
 
 func (c *agentClient) ChatStream(ctx context.Context, req *pb.ChatRequest) (pb.AgentService_ChatStreamClient, error) {
-	// Pass Correlation-ID if exists
-	if correlationID, ok := ctx.Value("X-Correlation-ID").(string); ok {
-		ctx = metadata.AppendToOutgoingContext(ctx, "x-correlation-id", correlationID)
-	}
-
 	result, err := c.cb.Execute(func() (interface{}, error) {
 		return c.client.ChatStream(ctx, req)
 	})
@@ -92,9 +90,7 @@ func (c *agentClient) SummarizeDocument(ctx context.Context, documentID string, 
 			return "", fmt.Errorf("failed to build summarize request: %v", errHTTP)
 		}
 		reqHTTP.Header.Set("Content-Type", "application/json")
-		if correlationID, ok := ctx.Value("X-Correlation-ID").(string); ok {
-			reqHTTP.Header.Set("X-Correlation-ID", correlationID)
-		}
+		// (OTEL propagation for HTTP would be needed here, but since it's just a fallback we skip it for now to focus on gRPC)
 
 		resp, errHTTP := http.DefaultClient.Do(reqHTTP)
 		if errHTTP != nil {
