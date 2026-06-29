@@ -1,3 +1,4 @@
+
 package domain
 
 import (
@@ -10,7 +11,7 @@ import (
 
 type ChatSession struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	UserID    uuid.UUID `json:"user_id"`
+	UserID    uuid.UUID `gorm:"type:uuid" json:"user_id"`
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -18,7 +19,7 @@ type ChatSession struct {
 
 type ChatMessage struct {
 	ID        uuid.UUID       `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	SessionID uuid.UUID       `json:"session_id"`
+	SessionID uuid.UUID       `gorm:"type:uuid" json:"session_id"`
 	Sender    string          `json:"sender"` // "user" or "ai"
 	Content   string          `json:"content"`
 	Sources   json.RawMessage `gorm:"type:jsonb;default:'[]'" json:"sources"`
