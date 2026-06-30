@@ -78,33 +78,10 @@ func (h *DocumentHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Poll database for up to 60 seconds to wait for ingestion result
-	// This makes the upload "fail" if any ingestion step fails, as requested.
-	timeout := 60
-	for i := 0; i < timeout; i++ {
-		doc, err := h.docUsecase.GetDocumentByID(c.Request.Context(), documentID)
-		if err == nil {
-			if doc.Status == "COMPLETED" {
-				c.JSON(http.StatusOK, gin.H{
-					"message":     "document uploaded and processed successfully",
-					"document_id": documentID,
-				})
-				return
-			}
-			if doc.Status == "FAILED" {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":       "document processing failed during ingestion pipeline",
-					"document_id": documentID,
-				})
-				return
-			}
-		}
-		
-		time.Sleep(1 * time.Second)
-	}
-
+	// Return 202 Accepted immediately. 
+	// The frontend handles polling the document status to check for COMPLETED or FAILED.
 	c.JSON(http.StatusAccepted, gin.H{
-		"message":     "document uploaded but still processing (timeout waiting for completion)",
+		"message":     "document uploaded and queued for processing",
 		"document_id": documentID,
 	})
 }
