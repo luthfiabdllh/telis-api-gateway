@@ -29,10 +29,23 @@ func (r *chatRepository) GetSessionByID(ctx context.Context, id uuid.UUID) (*dom
 	return &session, nil
 }
 
-func (r *chatRepository) GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.ChatSession, error) {
+func (r *chatRepository) GetSessionsByUserID(ctx context.Context, userID uuid.UUID, search string, page int, limit int) ([]*domain.ChatSession, int64, error) {
 	var sessions []*domain.ChatSession
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).Order("updated_at desc").Find(&sessions).Error
-	return sessions, err
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&domain.ChatSession{}).Where("user_id = ?", userID)
+
+	if search != "" {
+		query = query.Where("title ILIKE ?", "%"+search+"%")
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+	err := query.Order("updated_at desc").Offset(offset).Limit(limit).Find(&sessions).Error
+	return sessions, total, err
 }
 
 func (r *chatRepository) UpdateSessionTitle(ctx context.Context, id uuid.UUID, title string) error {
@@ -40,8 +53,19 @@ func (r *chatRepository) UpdateSessionTitle(ctx context.Context, id uuid.UUID, t
 }
 
 func (r *chatRepository) DeleteSession(ctx context.Context, id uuid.UUID) error {
-	// Karena di skema SQL ada ON DELETE CASCADE, menghapus session akan menghapus messages juga.
-	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.ChatSession{}).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Hapus semua pesan yang berelasi dengan session_id ini terlebih dahulu (Manual Cascade)
+		if err := tx.Where("session_id = ?", id).Delete(&domain.ChatMessage{}).Error; err != nil {
+			return err
+		}
+
+		// Setelah pesan terhapus, hapus session-nya
+		if err := tx.Where("id = ?", id).Delete(&domain.ChatSession{}).Error; err != nil {
+			return err
+		}
+		
+		return nil
+	})
 }
 
 func (r *chatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage) error {

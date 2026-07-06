@@ -22,8 +22,8 @@ func NewChatUsecase(chatRepo domain.ChatRepository) domain.ChatUsecase {
 	}
 }
 
-func (u *chatUsecase) GetSessions(ctx context.Context, userID uuid.UUID) ([]*domain.ChatSession, error) {
-	return u.chatRepo.GetSessionsByUserID(ctx, userID)
+func (u *chatUsecase) GetSessions(ctx context.Context, userID uuid.UUID, search string, page int, limit int) ([]*domain.ChatSession, int64, error) {
+	return u.chatRepo.GetSessionsByUserID(ctx, userID, search, page, limit)
 }
 
 func (u *chatUsecase) GetMessages(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID) ([]*domain.ChatMessage, error) {

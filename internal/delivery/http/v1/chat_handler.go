@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"bytes"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -199,7 +200,10 @@ func (h *ChatHandler) ChatStream(c *gin.Context) {
 // @Tags Chat
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} domain.ChatSession
+// @Param page query int false "Nomor Halaman" default(1)
+// @Param limit query int false "Jumlah data per halaman" default(20)
+// @Param search query string false "Kata kunci pencarian judul obrolan"
+// @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]interface{} "Unauthorized"
 // @Router /chat/sessions [get]
 func (h *ChatHandler) GetSessions(c *gin.Context) {
@@ -210,13 +214,46 @@ func (h *ChatHandler) GetSessions(c *gin.Context) {
 	}
 
 	userID, _ := uuid.Parse(userIDStr.(string))
-	sessions, err := h.chatUsecase.GetSessions(c.Request.Context(), userID)
+
+	// Pagination and Search params
+	page := 1
+	limit := 20
+	search := c.Query("search")
+
+	if pageStr := c.Query("page"); pageStr != "" {
+		if parsedPage, err := strconv.Atoi(pageStr); err == nil && parsedPage > 0 {
+			page = parsedPage
+		}
+	}
+
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	sessions, total, err := h.chatUsecase.GetSessions(c.Request.Context(), userID, search, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, sessions)
+	// Calculate hasNextPage
+	hasNextPage := (int64(page) * int64(limit)) < total
+
+	// Return array directly if there are no sessions to avoid nil JSON array (nil slice marshals to null in some cases, though gin handles it. Better to explicitly use empty array if nil, but keeping it simple as before: session handles it)
+	if sessions == nil {
+		sessions = make([]*domain.ChatSession, 0)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": sessions,
+		"meta": gin.H{
+			"currentPage": page,
+			"hasNextPage": hasNextPage,
+			"totalData":   total,
+		},
+	})
 }
 
 // GetSessionMessages godoc
@@ -309,9 +346,10 @@ func (h *ChatHandler) RenameSession(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Session ID"
-// @Success 200 {object} map[string]interface{}
+// @Success 204 "No Content"
 // @Failure 401 {object} map[string]interface{} "Unauthorized"
 // @Failure 403 {object} map[string]interface{} "Forbidden (Bukan pemilik sesi)"
+// @Failure 404 {object} map[string]interface{} "Not Found"
 // @Router /chat/sessions/{id} [delete]
 func (h *ChatHandler) DeleteSession(c *gin.Context) {
 	userIDStr, exists := c.Get("user_id")
@@ -329,11 +367,15 @@ func (h *ChatHandler) DeleteSession(c *gin.Context) {
 	}
 
 	if err := h.chatUsecase.DeleteSession(c.Request.Context(), sessionID, userID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "chat session not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "session deleted successfully"})
+	c.Status(http.StatusNoContent)
 }
 
 // ExtractText godoc

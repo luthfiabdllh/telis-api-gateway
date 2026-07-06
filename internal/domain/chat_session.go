@@ -38,7 +38,7 @@ func (ChatMessage) TableName() string {
 type ChatRepository interface {
 	CreateSession(ctx context.Context, session *ChatSession) error
 	GetSessionByID(ctx context.Context, id uuid.UUID) (*ChatSession, error)
-	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]*ChatSession, error)
+	GetSessionsByUserID(ctx context.Context, userID uuid.UUID, search string, page int, limit int) ([]*ChatSession, int64, error)
 	UpdateSessionTitle(ctx context.Context, id uuid.UUID, title string) error
 	DeleteSession(ctx context.Context, id uuid.UUID) error
 
@@ -47,7 +47,7 @@ type ChatRepository interface {
 }
 
 type ChatUsecase interface {
-	GetSessions(ctx context.Context, userID uuid.UUID) ([]*ChatSession, error)
+	GetSessions(ctx context.Context, userID uuid.UUID, search string, page int, limit int) ([]*ChatSession, int64, error)
 	GetMessages(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID) ([]*ChatMessage, error)
 	RenameSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, newTitle string) error
 	DeleteSession(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID) error
