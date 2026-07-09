@@ -43,7 +43,10 @@ func NewMetricsHandler(r *gin.RouterGroup, metricsUsecase domain.MetricsUsecase)
 // @Failure 500 {object} map[string]interface{} "Internal Server Error"
 // @Router /metrics/tokens [get]
 func (h *MetricsHandler) GetDashboardMetrics(c *gin.Context) {
-	metrics, err := h.metricsUsecase.GetDashboardMetrics(c.Request.Context())
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	metrics, err := h.metricsUsecase.GetDashboardMetrics(c.Request.Context(), startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

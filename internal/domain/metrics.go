@@ -99,18 +99,18 @@ type DashboardMetrics struct {
 
 type MetricsRepository interface {
 	GetTotalCostThisMonth(ctx context.Context) (float64, error)
-	GetTopUsersByCost(ctx context.Context, limit int) ([]UserCost, error)
-	GetDailyUsageTrend(ctx context.Context, days int) ([]DailyUsage, error)
+	GetTopUsersByCost(ctx context.Context, limit int, startDate, endDate string) ([]UserCost, error)
+	GetDailyUsageTrend(ctx context.Context, startDate, endDate string) ([]DailyUsage, error)
 	GetMyTotalCostThisMonth(ctx context.Context, userID string) (float64, error)
 	GetMyDailyUsageTrend(ctx context.Context, userID string, days int) ([]DailyUsage, error)
 	GetMyRecentActivity(ctx context.Context, userID string, limit int) ([]RecentActivity, error)
-	GetSystemOverview(ctx context.Context) (*SystemOverview, error)
+	GetSystemOverview(ctx context.Context, startDate, endDate string) (*SystemOverview, error)
 	GetRiskHeatmap(ctx context.Context) ([]RiskHeatmap, error)
 	GetExpiringContracts(ctx context.Context) ([]ExpiringContract, error)
 }
 
 type MetricsUsecase interface {
-	GetDashboardMetrics(ctx context.Context) (*DashboardMetrics, error)
+	GetDashboardMetrics(ctx context.Context, startDate, endDate string) (*DashboardMetrics, error)
 	GetMyMetrics(ctx context.Context, userID string) (*MyMetrics, error)
 	GetRiskHeatmap(ctx context.Context) ([]RiskHeatmap, error)
 	GetExpiringContracts(ctx context.Context) ([]ExpiringContract, error)

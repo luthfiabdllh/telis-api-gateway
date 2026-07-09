@@ -16,23 +16,23 @@ func NewMetricsUsecase(repo domain.MetricsRepository) domain.MetricsUsecase {
 	}
 }
 
-func (u *metricsUsecase) GetDashboardMetrics(ctx context.Context) (*domain.DashboardMetrics, error) {
+func (u *metricsUsecase) GetDashboardMetrics(ctx context.Context, startDate, endDate string) (*domain.DashboardMetrics, error) {
 	totalCost, err := u.repo.GetTotalCostThisMonth(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	topUsers, err := u.repo.GetTopUsersByCost(ctx, 5) // Top 5
+	topUsers, err := u.repo.GetTopUsersByCost(ctx, 5, startDate, endDate) // Top 5
 	if err != nil {
 		return nil, err
 	}
 
-	dailyTrend, err := u.repo.GetDailyUsageTrend(ctx, 30) // Last 30 days
+	dailyTrend, err := u.repo.GetDailyUsageTrend(ctx, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
 
-	systemOverview, err := u.repo.GetSystemOverview(ctx)
+	systemOverview, err := u.repo.GetSystemOverview(ctx, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}

@@ -31,16 +31,25 @@ func (r *metricsRepository) GetTotalCostThisMonth(ctx context.Context) (float64,
 	return total, nil
 }
 
-func (r *metricsRepository) GetTopUsersByCost(ctx context.Context, limit int) ([]domain.UserCost, error) {
+func (r *metricsRepository) GetTopUsersByCost(ctx context.Context, limit int, startDate, endDate string) ([]domain.UserCost, error) {
 	query := `
 		SELECT m.user_id, u.email, u.username as name, SUM(m.cost_usd) as total_cost
 		FROM agent.token_metrics m
 		JOIN gateway.users u ON m.user_id = u.id
-		GROUP BY m.user_id, u.email, u.username
-		ORDER BY total_cost DESC
-		LIMIT $1
+		WHERE 1=1
 	`
-	rows, err := r.db.QueryContext(ctx, query, limit)
+	args := []interface{}{}
+	if startDate != "" && endDate != "" {
+		query += " AND m.timestamp >= $1 AND m.timestamp <= $2"
+		args = append(args, startDate, endDate+" 23:59:59")
+		args = append(args, limit)
+		query += " GROUP BY m.user_id, u.email, u.username ORDER BY total_cost DESC LIMIT $3"
+	} else {
+		args = append(args, limit)
+		query += " GROUP BY m.user_id, u.email, u.username ORDER BY total_cost DESC LIMIT $1"
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,15 +66,22 @@ func (r *metricsRepository) GetTopUsersByCost(ctx context.Context, limit int) ([
 	return users, nil
 }
 
-func (r *metricsRepository) GetDailyUsageTrend(ctx context.Context, days int) ([]domain.DailyUsage, error) {
+func (r *metricsRepository) GetDailyUsageTrend(ctx context.Context, startDate, endDate string) ([]domain.DailyUsage, error) {
 	query := `
 		SELECT DATE(timestamp) as date, SUM(total_tokens) as total_tokens, SUM(cost_usd) as cost_usd
 		FROM agent.token_metrics
-		WHERE timestamp >= CURRENT_DATE - interval '1 day' * $1
-		GROUP BY DATE(timestamp)
-		ORDER BY DATE(timestamp) ASC
+		WHERE 1=1
 	`
-	rows, err := r.db.QueryContext(ctx, query, days)
+	args := []interface{}{}
+	if startDate != "" && endDate != "" {
+		query += " AND timestamp >= $1 AND timestamp <= $2"
+		args = append(args, startDate, endDate+" 23:59:59")
+	} else {
+		query += " AND timestamp >= CURRENT_DATE - interval '30 days'"
+	}
+	query += " GROUP BY DATE(timestamp) ORDER BY DATE(timestamp) ASC"
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +169,7 @@ func (r *metricsRepository) GetMyRecentActivity(ctx context.Context, userID stri
 	return activities, nil
 }
 
-func (r *metricsRepository) GetSystemOverview(ctx context.Context) (*domain.SystemOverview, error) {
+func (r *metricsRepository) GetSystemOverview(ctx context.Context, startDate, endDate string) (*domain.SystemOverview, error) {
 	overview := &domain.SystemOverview{}
 
 	// 1. Total Users
@@ -172,8 +188,15 @@ func (r *metricsRepository) GetSystemOverview(ctx context.Context) (*domain.Syst
 	}
 
 	// 4. Document Status Distribution
-	docQuery := `SELECT status, count(*) FROM ingestion.documents WHERE status != 'DELETED' GROUP BY status`
-	docRows, err := r.db.QueryContext(ctx, docQuery)
+	docQuery := `SELECT status, count(*) FROM ingestion.documents WHERE status != 'DELETED'`
+	docArgs := []interface{}{}
+	if startDate != "" && endDate != "" {
+		docQuery += " AND created_at >= $1 AND created_at <= $2"
+		docArgs = append(docArgs, startDate, endDate+" 23:59:59")
+	}
+	docQuery += ` GROUP BY status`
+
+	docRows, err := r.db.QueryContext(ctx, docQuery, docArgs...)
 	if err != nil {
 		return nil, err
 	}
