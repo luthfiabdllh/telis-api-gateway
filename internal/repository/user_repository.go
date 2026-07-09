@@ -81,3 +81,27 @@ func (r *userRepository) UpdateRole(ctx context.Context, id uuid.UUID, roleID in
 func (r *userRepository) UpdateStatus(ctx context.Context, id uuid.UUID, isBanned bool) error {
 	return r.db.WithContext(ctx).Model(&domain.User{}).Where("id = ?", id).Update("is_banned", isBanned).Error
 }
+
+func (r *userRepository) GetUserMetrics(ctx context.Context) (*domain.UserMetrics, error) {
+	var total, active, banned, admins int64
+
+	if err := r.db.WithContext(ctx).Model(&domain.User{}).Count(&total).Error; err != nil {
+		return nil, err
+	}
+	if err := r.db.WithContext(ctx).Model(&domain.User{}).Where("is_banned = ?", false).Count(&active).Error; err != nil {
+		return nil, err
+	}
+	if err := r.db.WithContext(ctx).Model(&domain.User{}).Where("is_banned = ?", true).Count(&banned).Error; err != nil {
+		return nil, err
+	}
+	if err := r.db.WithContext(ctx).Model(&domain.User{}).Where("role_id = ?", 1).Count(&admins).Error; err != nil {
+		return nil, err
+	}
+
+	return &domain.UserMetrics{
+		TotalUsers:  total,
+		ActiveUsers: active,
+		BannedUsers: banned,
+		TotalAdmins: admins,
+	}, nil
+}

@@ -43,3 +43,7 @@ func (u *userUsecase) UpdateUserStatus(ctx context.Context, id uuid.UUID, isBann
 
 	return u.userRepo.UpdateStatus(ctx, id, isBanned)
 }
+
+func (u *userUsecase) GetUserMetrics(ctx context.Context) (*domain.UserMetrics, error) {
+	return u.userRepo.GetUserMetrics(ctx)
+}

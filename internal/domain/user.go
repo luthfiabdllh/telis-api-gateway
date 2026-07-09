@@ -43,6 +43,7 @@ type UserRepository interface {
 	GetAll(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*User, int64, error)
 	UpdateRole(ctx context.Context, id uuid.UUID, roleID int) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, isBanned bool) error
+	GetUserMetrics(ctx context.Context) (*UserMetrics, error)
 }
 
 // UserUsecase defines the contract for user management
@@ -50,4 +51,13 @@ type UserUsecase interface {
 	GetAllUsers(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*User, int64, error)
 	UpdateUserRole(ctx context.Context, id uuid.UUID, roleID int, reqByAdminID uuid.UUID) error
 	UpdateUserStatus(ctx context.Context, id uuid.UUID, isBanned bool, reqByAdminID uuid.UUID) error
+	GetUserMetrics(ctx context.Context) (*UserMetrics, error)
+}
+
+// UserMetrics represents aggregated metrics for users
+type UserMetrics struct {
+	TotalUsers  int64 `json:"total_users"`
+	ActiveUsers int64 `json:"active_users"`
+	BannedUsers int64 `json:"banned_users"`
+	TotalAdmins int64 `json:"total_admins"`
 }

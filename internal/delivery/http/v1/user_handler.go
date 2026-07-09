@@ -23,6 +23,7 @@ func NewUserHandler(r *gin.RouterGroup, userUsecase domain.UserUsecase) {
 	{
 		userRoutes.GET("", handler.GetAll)
 		userRoutes.GET("/search", handler.Search)
+		userRoutes.GET("/metrics", handler.GetMetrics)
 		userRoutes.PUT("/:id/role", handler.UpdateRole)
 		userRoutes.PUT("/:id/ban", handler.UpdateStatus)
 	}
@@ -81,12 +82,22 @@ func (h *UserHandler) GetAll(c *gin.Context) {
 		return
 	}
 
+	lastPage := int((total + int64(limit) - 1) / int64(limit))
+	if lastPage == 0 {
+		lastPage = 1
+	}
+	hasNext := page < lastPage
+	hasPrev := page > 1
+
 	c.JSON(http.StatusOK, gin.H{
 		"data": users,
 		"meta": gin.H{
-			"page":  page,
-			"limit": limit,
-			"total": total,
+			"page":      page,
+			"limit":     limit,
+			"total":     total,
+			"last_page": lastPage,
+			"has_next":  hasNext,
+			"has_prev":  hasPrev,
 		},
 	})
 }
@@ -222,4 +233,34 @@ func (h *UserHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": statusMsg})
+}
+
+// GetMetrics godoc
+// @Summary Dapatkan metrik pengguna
+// @Description Mengambil total pengguna, pengguna aktif, pengguna di-ban, dan total admin
+// @Tags Users
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Forbidden"
+// @Failure 500 {object} map[string]interface{} "Internal Server Error"
+// @Router /users/metrics [get]
+func (h *UserHandler) GetMetrics(c *gin.Context) {
+	role, exists := c.Get("role")
+	if !exists || role.(string) != "Admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only admin can access this"})
+		return
+	}
+
+	metrics, err := h.userUsecase.GetUserMetrics(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   metrics,
+	})
 }
