@@ -49,18 +49,23 @@ func (u *metricsUsecase) GetDashboardMetrics(ctx context.Context, startDate, end
 	}, nil
 }
 
-func (u *metricsUsecase) GetMyMetrics(ctx context.Context, userID string) (*domain.MyMetrics, error) {
+func (u *metricsUsecase) GetMyMetrics(ctx context.Context, userID string, startDate, endDate string) (*domain.MyMetrics, error) {
 	totalCost, err := u.repo.GetMyTotalCostThisMonth(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	dailyTrend, err := u.repo.GetMyDailyUsageTrend(ctx, userID, 30) // last 30 days
+	dailyTrend, err := u.repo.GetMyDailyUsageTrend(ctx, userID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
 
-	recentActivities, err := u.repo.GetMyRecentActivity(ctx, userID, 5) // top 5 recent
+	recentActivities, err := u.repo.GetMyRecentActivity(ctx, userID, 5, startDate, endDate) // top 5 recent
+	if err != nil {
+		return nil, err
+	}
+	
+	featureUsageDist, err := u.repo.GetFeatureUsageDist(ctx, userID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +74,7 @@ func (u *metricsUsecase) GetMyMetrics(ctx context.Context, userID string) (*doma
 		TotalCostThisMonth: totalCost,
 		DailyTrend:         dailyTrend,
 		RecentActivities:   recentActivities,
+		FeatureUsageDist:   featureUsageDist,
 	}, nil
 }
 

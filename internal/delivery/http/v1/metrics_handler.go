@@ -72,7 +72,10 @@ func (h *MetricsHandler) GetMyMetrics(c *gin.Context) {
 		return
 	}
 
-	myMetrics, err := h.metricsUsecase.GetMyMetrics(c.Request.Context(), userID.(string))
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	myMetrics, err := h.metricsUsecase.GetMyMetrics(c.Request.Context(), userID.(string), startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

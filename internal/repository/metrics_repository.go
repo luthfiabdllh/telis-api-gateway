@@ -116,15 +116,22 @@ func (r *metricsRepository) GetMyTotalCostThisMonth(ctx context.Context, userID 
 	return total, nil
 }
 
-func (r *metricsRepository) GetMyDailyUsageTrend(ctx context.Context, userID string, days int) ([]domain.DailyUsage, error) {
+func (r *metricsRepository) GetMyDailyUsageTrend(ctx context.Context, userID string, startDate, endDate string) ([]domain.DailyUsage, error) {
 	query := `
 		SELECT DATE(timestamp) as date, SUM(total_tokens) as total_tokens, SUM(cost_usd) as cost_usd
 		FROM agent.token_metrics
-		WHERE user_id = $1 AND timestamp >= CURRENT_DATE - interval '1 day' * $2
-		GROUP BY DATE(timestamp)
-		ORDER BY DATE(timestamp) ASC
+		WHERE user_id = $1
 	`
-	rows, err := r.db.QueryContext(ctx, query, userID, days)
+	args := []interface{}{userID}
+	if startDate != "" && endDate != "" {
+		query += " AND timestamp >= $2 AND timestamp <= $3"
+		args = append(args, startDate, endDate+" 23:59:59")
+	} else {
+		query += " AND timestamp >= CURRENT_DATE - interval '30 days'"
+	}
+	query += " GROUP BY DATE(timestamp) ORDER BY DATE(timestamp) ASC"
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -143,16 +150,25 @@ func (r *metricsRepository) GetMyDailyUsageTrend(ctx context.Context, userID str
 	return trends, nil
 }
 
-func (r *metricsRepository) GetMyRecentActivity(ctx context.Context, userID string, limit int) ([]domain.RecentActivity, error) {
-	// Let's use token_metrics to approximate recent activity
+func (r *metricsRepository) GetMyRecentActivity(ctx context.Context, userID string, limit int, startDate, endDate string) ([]domain.RecentActivity, error) {
 	query := `
-		SELECT id, COALESCE(model_name, 'Chat') as type, 'Sesi AI' as title, total_tokens, cost_usd, timestamp
+		SELECT id, COALESCE(model_name, 'Chat') as type, 'Sesi AI' as title, total_tokens, cost_usd, timestamp, prompt_tokens as input_tokens, completion_tokens as output_tokens
 		FROM agent.token_metrics
 		WHERE user_id = $1
-		ORDER BY timestamp DESC
-		LIMIT $2
 	`
-	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	args := []interface{}{userID}
+	
+	if startDate != "" && endDate != "" {
+		query += " AND timestamp >= $2 AND timestamp <= $3"
+		args = append(args, startDate, endDate+" 23:59:59")
+		args = append(args, limit)
+		query += " ORDER BY timestamp DESC LIMIT $4"
+	} else {
+		args = append(args, limit)
+		query += " ORDER BY timestamp DESC LIMIT $2"
+	}
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,12 +177,44 @@ func (r *metricsRepository) GetMyRecentActivity(ctx context.Context, userID stri
 	var activities []domain.RecentActivity
 	for rows.Next() {
 		var a domain.RecentActivity
-		if err := rows.Scan(&a.ID, &a.Type, &a.Title, &a.Tokens, &a.CostUSD, &a.Timestamp); err != nil {
+		if err := rows.Scan(&a.ID, &a.Type, &a.Title, &a.Tokens, &a.CostUSD, &a.Timestamp, &a.InputTokens, &a.OutputTokens); err != nil {
 			return nil, err
 		}
 		activities = append(activities, a)
 	}
 	return activities, nil
+}
+
+func (r *metricsRepository) GetFeatureUsageDist(ctx context.Context, userID string, startDate, endDate string) ([]domain.FeatureUsageDist, error) {
+	query := `
+		SELECT COALESCE(model_name, 'Chat') as feature, SUM(cost_usd) as cost_usd, SUM(total_tokens) as tokens
+		FROM agent.token_metrics
+		WHERE user_id = $1
+	`
+	args := []interface{}{userID}
+	
+	if startDate != "" && endDate != "" {
+		query += " AND timestamp >= $2 AND timestamp <= $3"
+		args = append(args, startDate, endDate+" 23:59:59")
+	}
+	
+	query += " GROUP BY feature ORDER BY cost_usd DESC"
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dists []domain.FeatureUsageDist
+	for rows.Next() {
+		var d domain.FeatureUsageDist
+		if err := rows.Scan(&d.Feature, &d.CostUSD, &d.Tokens); err != nil {
+			return nil, err
+		}
+		dists = append(dists, d)
+	}
+	return dists, nil
 }
 
 func (r *metricsRepository) GetSystemOverview(ctx context.Context, startDate, endDate string) (*domain.SystemOverview, error) {
