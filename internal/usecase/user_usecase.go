@@ -19,8 +19,8 @@ func NewUserUsecase(userRepo domain.UserRepository) domain.UserUsecase {
 	}
 }
 
-func (u *userUsecase) GetAllUsers(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*domain.User, int64, error) {
-	return u.userRepo.GetAll(ctx, page, limit, search, roleID, isBanned)
+func (u *userUsecase) GetAllUsers(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool, sortBy, sortDir string) ([]*domain.User, int64, error) {
+	return u.userRepo.GetAll(ctx, page, limit, search, roleID, isBanned, sortBy, sortDir)
 }
 
 func (u *userUsecase) UpdateUserRole(ctx context.Context, id uuid.UUID, roleID int, reqByAdminID uuid.UUID) error {

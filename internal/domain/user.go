@@ -40,7 +40,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
-	GetAll(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*User, int64, error)
+	GetAll(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool, sortBy, sortDir string) ([]*User, int64, error)
 	UpdateRole(ctx context.Context, id uuid.UUID, roleID int) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, isBanned bool) error
 	GetUserMetrics(ctx context.Context) (*UserMetrics, error)
@@ -48,7 +48,7 @@ type UserRepository interface {
 
 // UserUsecase defines the contract for user management
 type UserUsecase interface {
-	GetAllUsers(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*User, int64, error)
+	GetAllUsers(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool, sortBy, sortDir string) ([]*User, int64, error)
 	UpdateUserRole(ctx context.Context, id uuid.UUID, roleID int, reqByAdminID uuid.UUID) error
 	UpdateUserStatus(ctx context.Context, id uuid.UUID, isBanned bool, reqByAdminID uuid.UUID) error
 	GetUserMetrics(ctx context.Context) (*UserMetrics, error)

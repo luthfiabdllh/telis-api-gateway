@@ -46,7 +46,7 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 	return &user, nil
 }
 
-func (r *userRepository) GetAll(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool) ([]*domain.User, int64, error) {
+func (r *userRepository) GetAll(ctx context.Context, page, limit int, search string, roleID *int, isBanned *bool, sortBy, sortDir string) ([]*domain.User, int64, error) {
 	var users []*domain.User
 	var total int64
 
@@ -66,10 +66,19 @@ func (r *userRepository) GetAll(ctx context.Context, page, limit int, search str
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
+	
+	// Ensure safe order by fallback
+	validSortCols := map[string]bool{"username": true, "email": true, "created_at": true, "role_id": true, "is_banned": true}
+	if !validSortCols[sortBy] {
+		sortBy = "created_at"
+	}
+	if sortDir != "asc" && sortDir != "desc" {
+		sortDir = "desc"
+	}
 
 	// Pagination
 	offset := (page - 1) * limit
-	err := query.Preload("Role").Order("created_at desc").Offset(offset).Limit(limit).Find(&users).Error
+	err := query.Preload("Role").Order(sortBy + " " + sortDir).Offset(offset).Limit(limit).Find(&users).Error
 
 	return users, total, err
 }

@@ -40,6 +40,8 @@ func NewUserHandler(r *gin.RouterGroup, userUsecase domain.UserUsecase) {
 // @Param search query string false "Pencarian nama atau email"
 // @Param role_id query int false "Filter berdasarkan Role ID (1=Admin, 2=User, 3=Legal)"
 // @Param is_banned query bool false "Filter berdasarkan status banned"
+// @Param sort_by query string false "Kolom untuk sorting (username, email, created_at, role_id, is_banned)"
+// @Param sort_dir query string false "Arah sorting (asc, desc)"
 // @Success 200 {object} map[string]interface{} "Daftar pengguna dengan metadata paginasi"
 // @Failure 401 {object} map[string]interface{} "Unauthorized"
 // @Failure 403 {object} map[string]interface{} "Forbidden (Bukan Admin)"
@@ -76,7 +78,10 @@ func (h *UserHandler) GetAll(c *gin.Context) {
 		isBanned = &banned
 	}
 
-	users, total, err := h.userUsecase.GetAllUsers(c.Request.Context(), page, limit, search, roleID, isBanned)
+	sortBy := c.Query("sort_by")
+	sortDir := c.Query("sort_dir")
+
+	users, total, err := h.userUsecase.GetAllUsers(c.Request.Context(), page, limit, search, roleID, isBanned, sortBy, sortDir)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -114,7 +119,7 @@ func (h *UserHandler) GetAll(c *gin.Context) {
 func (h *UserHandler) Search(c *gin.Context) {
 	search := c.Query("q")
 
-	users, _, err := h.userUsecase.GetAllUsers(c.Request.Context(), 1, 20, search, nil, nil)
+	users, _, err := h.userUsecase.GetAllUsers(c.Request.Context(), 1, 20, search, nil, nil, "", "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
